@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 from git import Repo
@@ -5,21 +6,19 @@ from git import Repo
 
 class GitHubService:
 
-    def clone_repository(
-        self,
-        url: str,
-    ) -> str:
+    CLONE_DIRECTORY = Path("repositories")
 
-        repo_name = url.rstrip("/").split("/")[-1]
+    def clone_repository(self, url: str):
 
-        clone_path = Path("repositories") / repo_name
+        self.CLONE_DIRECTORY.mkdir(exist_ok=True)
 
-        if clone_path.exists():
-            return str(clone_path)
+        repository_name = url.rstrip("/").split("/")[-1]
 
-        Repo.clone_from(
-            url,
-            clone_path,
-        )
+        destination = self.CLONE_DIRECTORY / repository_name
 
-        return str(clone_path)
+        if destination.exists():
+            shutil.rmtree(destination)
+
+        Repo.clone_from(url, destination)
+
+        return str(destination)

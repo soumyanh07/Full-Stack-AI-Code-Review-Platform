@@ -1,13 +1,13 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
 
 
-class Repository(Base):
-    __tablename__ = "repositories"
+class SourceFile(Base):
+    __tablename__ = "source_files"
 
     id: Mapped[int] = mapped_column(
         Integer,
@@ -15,19 +15,23 @@ class Repository(Base):
         index=True,
     )
 
-    name: Mapped[str] = mapped_column(
-        String(255),
+    repository_id: Mapped[int] = mapped_column(
+        ForeignKey("repositories.id"),
         nullable=False,
     )
 
-    url: Mapped[str] = mapped_column(
+    path: Mapped[str] = mapped_column(
         String(500),
         nullable=False,
-        unique=True,
     )
 
-    local_path: Mapped[str] = mapped_column(
-        String(500),
+    language: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    content: Mapped[str] = mapped_column(
+        Text,
         nullable=False,
     )
 

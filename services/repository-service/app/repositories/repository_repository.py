@@ -11,10 +11,12 @@ class RepositoryRepository:
         self,
         name: str,
         url: str,
+        local_path: str,
     ) -> Repository:
         repository = Repository(
             name=name,
             url=url,
+            local_path=local_path,
         )
 
         self.db.add(repository)

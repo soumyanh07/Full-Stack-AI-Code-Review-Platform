@@ -10,6 +10,7 @@ class RepositoryResponse(BaseModel):
     id: int
     name: str
     url: str
+    local_path: str
 
     class Config:
         from_attributes = True
