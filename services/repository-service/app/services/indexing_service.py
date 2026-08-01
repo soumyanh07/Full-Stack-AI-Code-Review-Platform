@@ -1,33 +1,34 @@
-from app.services.parser_service import ParserService
-from app.services.file_service import FileService
 from app.repositories.source_file_repository import SourceFileRepository
+from app.services.parser_service import ParserService
 
 
 class IndexingService:
-
     def __init__(self, db):
-        self.files = FileService()
+        self.repository = SourceFileRepository(db)
         self.parser = ParserService()
-        self.source_repository = SourceFileRepository(db)
 
-    def index_repository(
-        self,
-        repository_id: int,
-        local_path: str,
-    ):
-        scanned_files = self.files.scan_repository(local_path)
-
+    def index_repository(self, repository_id: int, files: list[str]) -> int:
         indexed = 0
 
-        for file in scanned_files:
+        for file_path in files:
+            # Read file content
+            content = self.parser.read_file(file_path)
 
-            parsed = self.parser.parse_file(file)
+            if content is None:
+                continue
 
-            self.source_repository.create_file(
+            # Parse only Python files
+            metadata = None
+            if file_path.endswith(".py"):
+                metadata = self.parser.parse_python_file(file_path)
+
+            # Save file in PostgreSQL
+            self.repository.create_source_file(
                 repository_id=repository_id,
-                path=parsed["path"],
-                language=parsed["language"],
-                content=parsed["content"],
+                file_path=file_path,
+                language=file_path.split(".")[-1].lower(),
+                content=content,
+                metadata=metadata,
             )
 
             indexed += 1

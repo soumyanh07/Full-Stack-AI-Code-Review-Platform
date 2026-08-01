@@ -1,56 +1,114 @@
 from pathlib import Path
 
+from tree_sitter import Language, Parser
+import tree_sitter_python
+
 
 class ParserService:
-
-    EXTENSIONS = {
-        ".py": "Python",
-        ".js": "JavaScript",
-        ".ts": "TypeScript",
-        ".tsx": "React",
-        ".jsx": "React",
-        ".java": "Java",
-        ".cpp": "C++",
-        ".c": "C",
-        ".cs": "C#",
-        ".go": "Go",
-        ".rs": "Rust",
-        ".php": "PHP",
-        ".rb": "Ruby",
-        ".swift": "Swift",
-        ".kt": "Kotlin",
-        ".html": "HTML",
-        ".css": "CSS",
-        ".scss": "SCSS",
-        ".json": "JSON",
-        ".yaml": "YAML",
-        ".yml": "YAML",
-        ".xml": "XML",
-        ".md": "Markdown",
-        ".sql": "SQL",
+    SUPPORTED_EXTENSIONS = {
+        ".py",
+        ".js",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".java",
+        ".cpp",
+        ".c",
+        ".cs",
+        ".go",
+        ".rs",
+        ".php",
+        ".html",
+        ".css",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".md",
+        ".sql",
+        ".xml",
+        ".sh",
     }
 
-    def parse_file(self, file_path: str):
+    def __init__(self):
+        self.parser = Parser()
+        self.parser.language = Language(tree_sitter_python.language())
+
+    def read_file(self, file_path: str):
         path = Path(file_path)
 
-        language = self.EXTENSIONS.get(
-            path.suffix.lower(),
-            "Unknown",
-        )
+        if path.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
+            return None
 
         try:
-            with open(
-                file_path,
-                "r",
+            return path.read_text(
                 encoding="utf-8",
                 errors="ignore",
-            ) as file:
-                content = file.read()
+            )
         except Exception:
-            content = ""
+            return None
+
+    def parse_python_file(self, file_path: str):
+        code = self.read_file(file_path)
+
+        if code is None:
+            return None
+
+        tree = self.parser.parse(code.encode("utf-8"))
+        root = tree.root_node
+
+        functions = []
+        classes = []
+        imports = []
+
+        self._walk(
+            root,
+            code,
+            functions,
+            classes,
+            imports,
+        )
 
         return {
-            "path": str(path),
-            "language": language,
-            "content": content,
+            "functions": functions,
+            "classes": classes,
+            "imports": imports,
         }
+
+    def _walk(
+        self,
+        node,
+        code,
+        functions,
+        classes,
+        imports,
+    ):
+        if node.type == "function_definition":
+            functions.append({
+                "text": code[node.start_byte:node.end_byte],
+                "start_line": node.start_point[0] + 1,
+                "end_line": node.end_point[0] + 1,
+            })
+
+        elif node.type == "class_definition":
+            classes.append({
+                "text": code[node.start_byte:node.end_byte],
+                "start_line": node.start_point[0] + 1,
+                "end_line": node.end_point[0] + 1,
+            })
+
+        elif node.type in (
+            "import_statement",
+            "import_from_statement",
+        ):
+            imports.append(
+                code[node.start_byte:node.end_byte]
+            )
+
+        for child in node.children:
+            self._walk(
+                child,
+                code,
+                functions,
+                classes,
+                imports,
+            )

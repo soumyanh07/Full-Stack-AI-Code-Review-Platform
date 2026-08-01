@@ -1,20 +1,18 @@
 from fastapi import HTTPException
 
 from app.repositories.repository_repository import RepositoryRepository
-from app.repositories.source_file_repository import SourceFileRepository
 from app.services.file_service import FileService
 from app.services.github_service import GitHubService
-from app.services.parser_service import ParserService
+from app.services.indexing_service import IndexingService
 
 
 class RepositoryService:
 
     def __init__(self, db):
         self.repository = RepositoryRepository(db)
-        self.source_repository = SourceFileRepository(db)
         self.github = GitHubService()
         self.file_service = FileService()
-        self.parser = ParserService()
+        self.indexing = IndexingService(db)
 
     def create_repository(self, repository):
 
@@ -26,33 +24,29 @@ class RepositoryService:
                 detail="Repository already exists.",
             )
 
+        # Clone GitHub repository
         local_path = self.github.clone_repository(repository.url)
 
+        # Save repository in PostgreSQL
         repo = self.repository.create_repository(
             name=repository.name,
             url=repository.url,
             local_path=local_path,
         )
 
+        # Scan repository files
         files = self.file_service.scan_repository(local_path)
+
+        # Index all files into PostgreSQL
+        indexed = self.indexing.index_repository(
+            repo.id,
+            files,
+        )
 
         print("=" * 60)
         print(f"Repository cloned to: {local_path}")
         print(f"Files found: {len(files)}")
-
-        for file in files:
-
-            parsed = self.parser.parse_file(file)
-
-            self.source_repository.create_file(
-                repository_id=repo.id,
-                path=parsed["path"],
-                language=parsed["language"],
-                content=parsed["content"],
-            )
-
-            print(parsed["path"])
-
+        print(f"Indexed files: {indexed}")
         print("=" * 60)
 
         return repo
