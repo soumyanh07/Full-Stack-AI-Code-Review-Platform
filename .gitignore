@@ -55,3 +55,9 @@ postgres-data/
 
 # Grafana
 grafana-data/
+
+
+services/repository-service/repositories/
+.venv/
+__pycache__/
+*.pyc
