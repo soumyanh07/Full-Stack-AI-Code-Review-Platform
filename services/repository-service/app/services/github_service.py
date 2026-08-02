@@ -1,4 +1,6 @@
+import os
 import shutil
+import stat
 from pathlib import Path
 
 from git import Repo
@@ -7,6 +9,11 @@ from git import Repo
 class GitHubService:
 
     CLONE_DIRECTORY = Path("repositories")
+
+    @staticmethod
+    def _remove_readonly(func, path, exc_info):
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
 
     def clone_repository(self, url: str):
 
@@ -17,7 +24,7 @@ class GitHubService:
         destination = self.CLONE_DIRECTORY / repository_name
 
         if destination.exists():
-            shutil.rmtree(destination)
+            shutil.rmtree(destination, onerror=self._remove_readonly)
 
         Repo.clone_from(url, destination)
 

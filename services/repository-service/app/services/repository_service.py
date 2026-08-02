@@ -37,17 +37,22 @@ class RepositoryService:
         # Scan repository files
         files = self.file_service.scan_repository(local_path)
 
-        # Index all files into PostgreSQL
+        print("=" * 60)
+        print("Repository:", local_path)
+        print("Files found:", len(files))
+
+        for f in files[:10]:
+            print(f)
+
+        print("=" * 60)
+
+        # Index files
         indexed = self.indexing.index_repository(
             repo.id,
             files,
         )
 
-        print("=" * 60)
-        print(f"Repository cloned to: {local_path}")
-        print(f"Files found: {len(files)}")
-        print(f"Indexed files: {indexed}")
-        print("=" * 60)
+        print("Indexed:", indexed)
 
         return repo
 
