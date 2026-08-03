@@ -10,6 +10,7 @@ class QdrantService:
     COLLECTION_NAME = "source_code"
 
     def __init__(self):
+        # Use the Docker Compose service name instead of localhost
         self.client = QdrantClient(
             host="localhost",
             port=6333,
