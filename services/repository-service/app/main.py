@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.api.v1.routes import router
 from app.api.v1.search import router as search_router
+from app.api.v1.review import router as review_router
 from app.core.config import settings
 
 app = FastAPI(
@@ -18,6 +19,12 @@ app.include_router(
 # Semantic Search API
 app.include_router(
     search_router,
+    prefix="/api/v1",
+)
+
+# AI Review API
+app.include_router(
+    review_router,
     prefix="/api/v1",
 )
 
