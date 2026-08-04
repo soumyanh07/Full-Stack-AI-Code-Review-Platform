@@ -1,15 +1,11 @@
 from github import Github
-from app.core.config import settings
 import tempfile
-import subprocess
 import shutil
+import subprocess
 import os
 
 
 class GitHubService:
-
-    def __init__(self):
-        self.github = Github(settings.GITHUB_TOKEN)
 
     def clone_repository(self, repo_url: str):
         temp_dir = tempfile.mkdtemp()
@@ -29,3 +25,6 @@ class GitHubService:
     def delete_repository(self, path: str):
         if os.path.exists(path):
             shutil.rmtree(path)
+
+
+           
