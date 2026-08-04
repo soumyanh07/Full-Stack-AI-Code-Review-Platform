@@ -13,6 +13,7 @@ function Register() {
 
     try {
       await api.post("/auth/register", {
+        username: email.split("@")[0],
         email,
         password,
       });

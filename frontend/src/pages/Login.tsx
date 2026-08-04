@@ -21,14 +21,15 @@ function Login() {
 
       login(
         response.data.access_token,
-        response.data.user
+        { id: 0, email }
       );
 
       navigate("/dashboard");
 
     } catch (error) {
       console.error(error);
-      alert("Invalid credentials");
+      const message = error instanceof Error ? error.message : "Unknown error";
+      alert(`Login failed: ${message}`);
     }
   };
 
@@ -49,6 +50,7 @@ function Login() {
           className="w-full p-3 mb-4 rounded bg-gray-700 text-white"
           placeholder="Email"
           type="email"
+          value={email}
           onChange={(e)=>setEmail(e.target.value)}
         />
 
@@ -56,6 +58,7 @@ function Login() {
           className="w-full p-3 mb-6 rounded bg-gray-700 text-white"
           placeholder="Password"
           type="password"
+          value={password}
           onChange={(e)=>setPassword(e.target.value)}
         />
 
