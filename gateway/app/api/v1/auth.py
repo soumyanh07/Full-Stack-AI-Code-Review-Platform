@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from app.schemas.token import LoginRequest
-from app.services.auth_service import AuthService
+from app.core.config import settings
+from app.utils.proxy import ProxyClient
 
 router = APIRouter(tags=["Authentication"])
 
@@ -10,10 +10,10 @@ router = APIRouter(tags=["Authentication"])
 @router.post("/auth/login")
 async def login(request: Request):
     body = await request.json()
-    auth_service = AuthService(db=None)
-    token = auth_service.login(LoginRequest(**body))
-
-    return JSONResponse(
-        status_code=200,
-        content=token.model_dump(),
+    data, status_code = await ProxyClient.forward(
+        method="POST",
+        url=f"{settings.AUTH_SERVICE.rstrip('/')}/api/v1/auth/login",
+        headers={"Content-Type": "application/json"},
+        body=body,
     )
+    return JSONResponse(status_code=status_code, content=data)
