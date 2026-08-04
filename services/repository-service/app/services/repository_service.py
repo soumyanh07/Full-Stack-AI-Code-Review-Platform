@@ -1,63 +1,53 @@
-from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
-from app.repositories.repository_repository import RepositoryRepository
-from app.services.file_service import FileService
+from app.models.repository import Repository
+from app.schemas.repository import RepositoryCreate
+
 from app.services.github_service import GitHubService
-from app.services.indexing_service import IndexingService
+from app.services.indexer_service import IndexerService
 
 
 class RepositoryService:
 
-    def __init__(self, db):
-        self.repository = RepositoryRepository(db)
+    def __init__(self, db: Session):
+        self.db = db
         self.github = GitHubService()
-        self.file_service = FileService()
-        self.indexing = IndexingService(db)
+        self.indexer = IndexerService()
 
-    def create_repository(self, repository):
+    def create_repository(
+        self,
+        repository: RepositoryCreate,
+    ):
+        # Clone repository
+        local_path = self.github.clone_repository(
+            repository.url
+        )
 
-        existing = self.repository.get_by_url(repository.url)
-
-        if existing:
-            raise HTTPException(
-                status_code=409,
-                detail="Repository already exists.",
-            )
-
-        # Clone GitHub repository
-        local_path = self.github.clone_repository(repository.url)
-
-        # Save repository in PostgreSQL
-        repo = self.repository.create_repository(
+        # Save repository
+        db_repo = Repository(
             name=repository.name,
             url=repository.url,
             local_path=local_path,
         )
 
-        # Scan repository files
-        files = self.file_service.scan_repository(local_path)
+        self.db.add(db_repo)
+        self.db.commit()
+        self.db.refresh(db_repo)
 
-        print("=" * 60)
-        print("Repository:", local_path)
-        print("Files found:", len(files))
-
-        for f in files[:10]:
-            print(f)
-
-        print("=" * 60)
-
-        # Index files
-        indexed = self.indexing.index_repository(
-            repo.id,
-            files,
+        # Automatically index the repository
+        self.indexer.index_repository(
+            repository_id=db_repo.id,
+            repository_path=local_path,
         )
 
-        print("Indexed:", indexed)
-
-        return repo
-
-    def get_repositories(self):
-        return self.repository.get_all()
+        return db_repo
 
     def get_repository(self, repo_id: int):
-        return self.repository.get_by_id(repo_id)
+        return (
+            self.db.query(Repository)
+            .filter(Repository.id == repo_id)
+            .first()
+        )
+
+    def get_repositories(self):
+        return self.db.query(Repository).all()
