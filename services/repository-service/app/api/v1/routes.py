@@ -1,3 +1,4 @@
+from app.api.v1.webhook import router as webhook_router
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.schemas.chat import ChatRequest, ChatResponse
@@ -88,4 +89,9 @@ def review_pull_request(
     return service.review_pull_request(
         repository=request.repository,
         pr_number=request.pr_number,
-    )    
+    )
+
+
+router.include_router(
+    webhook_router,
+)
