@@ -17,7 +17,7 @@ def create_access_token(
 
     expire = datetime.now(UTC) + (
         expires_delta
-        if expires_delta
+        if expires_delta is not None
         else timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 

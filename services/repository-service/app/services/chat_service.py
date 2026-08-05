@@ -25,6 +25,7 @@ class ChatService:
         )
 
         context = []
+        
 
         for point in results:
             payload = point.payload

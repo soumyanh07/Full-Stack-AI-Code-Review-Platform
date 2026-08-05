@@ -1,23 +1,20 @@
 from fastapi import FastAPI
 
-
 from app.api.v1.routes import router
 from app.core.config import settings
+from app.core.logger import configure_logging
 from app.middleware.cors import register_cors
 from app.middleware.request_id import RequestIDMiddleware
+from app.middleware.request_logging import RequestLoggingMiddleware
 
+configure_logging()
 
 app = FastAPI(
-
     title=settings.APP_NAME,
-
     version=settings.API_VERSION,
-
     docs_url="/docs",
-
     redoc_url="/redoc",
 )
-
 
 register_cors(app)
 
@@ -28,10 +25,9 @@ async def root():
 
 
 app.add_middleware(RequestIDMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(
-
     router,
-
     prefix="/api/v1",
 )

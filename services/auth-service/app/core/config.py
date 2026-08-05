@@ -10,7 +10,8 @@ class Settings(BaseSettings):
 
     DEBUG: bool = True
 
-    DATABASE_URL: str = "sqlite:///./auth.db"
+    DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:1234/ai_code_review"
+
 
     SECRET_KEY: str = "THIS_IS_A_LONG_RANDOM_SECRET_KEY_CHANGE_ME"
     ALGORITHM: str = "HS256"
