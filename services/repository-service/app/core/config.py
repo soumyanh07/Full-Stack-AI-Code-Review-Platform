@@ -12,6 +12,10 @@ class Settings(BaseSettings):
 
     GITHUB_TOKEN: str
 
+    REPOSITORY_STORAGE: str = "./repositories"
+
+
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",

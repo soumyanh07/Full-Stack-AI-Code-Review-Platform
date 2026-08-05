@@ -4,6 +4,7 @@ from app.services.qdrant_service import QdrantService
 
 class SearchService:
 
+
     def __init__(self):
         self.embedding = EmbeddingService()
         self.qdrant = QdrantService()

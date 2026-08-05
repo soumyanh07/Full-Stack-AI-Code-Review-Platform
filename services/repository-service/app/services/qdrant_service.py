@@ -57,3 +57,5 @@ class QdrantService:
             query=embedding,
             limit=limit,
         ).points
+
+    

@@ -1,114 +1,74 @@
-from pathlib import Path
+from __future__ import annotations
 
-from tree_sitter import Language, Parser
-import tree_sitter_python
+from pathlib import Path
 
 
 class ParserService:
-    SUPPORTED_EXTENSIONS = {
-        ".py",
-        ".js",
-        ".ts",
-        ".tsx",
-        ".jsx",
-        ".java",
-        ".cpp",
-        ".c",
-        ".cs",
-        ".go",
-        ".rs",
-        ".php",
-        ".html",
-        ".css",
-        ".json",
-        ".yaml",
-        ".yml",
-        ".md",
-        ".sql",
-        ".xml",
-        ".sh",
+    """
+    Detects programming languages and extracts file metadata.
+    """
+
+    LANGUAGE_MAP = {
+        ".py": "python",
+        ".js": "javascript",
+        ".ts": "typescript",
+        ".tsx": "typescript",
+        ".jsx": "javascript",
+        ".java": "java",
+        ".cpp": "cpp",
+        ".cc": "cpp",
+        ".c": "c",
+        ".cs": "csharp",
+        ".go": "go",
+        ".rs": "rust",
+        ".php": "php",
+        ".rb": "ruby",
+        ".swift": "swift",
+        ".kt": "kotlin",
+        ".scala": "scala",
+        ".sql": "sql",
+        ".html": "html",
+        ".css": "css",
+        ".scss": "scss",
+        ".json": "json",
+        ".yaml": "yaml",
+        ".yml": "yaml",
+        ".xml": "xml",
+        ".md": "markdown",
+        ".dockerfile": "docker",
     }
 
-    def __init__(self):
-        self.parser = Parser()
-        self.parser.language = Language(tree_sitter_python.language())
+    def language(self, path: Path) -> str:
+        suffix = path.suffix.lower()
 
-    def read_file(self, file_path: str):
-        path = Path(file_path)
+        if path.name.lower() == "dockerfile":
+            return "docker"
 
-        if path.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
-            return None
+        return self.LANGUAGE_MAP.get(
+            suffix,
+            "text",
+        )
 
-        try:
-            return path.read_text(
-                encoding="utf-8",
-                errors="ignore",
-            )
-        except Exception:
-            return None
+    def metadata(self, path: Path) -> dict:
 
-    def parse_python_file(self, file_path: str):
-        code = self.read_file(file_path)
+        return {
+            "filename": path.name,
+            "extension": path.suffix.lower(),
+            "language": self.language(path),
+            "path": str(path),
+        }
 
-        if code is None:
-            return None
+    def parse(
+        self,
+        path: Path,
+    ) -> dict:
 
-        tree = self.parser.parse(code.encode("utf-8"))
-        root = tree.root_node
-
-        functions = []
-        classes = []
-        imports = []
-
-        self._walk(
-            root,
-            code,
-            functions,
-            classes,
-            imports,
+        content = path.read_text(
+            encoding="utf-8",
+            errors="ignore",
         )
 
         return {
-            "functions": functions,
-            "classes": classes,
-            "imports": imports,
+            **self.metadata(path),
+            "content": content,
         }
-
-    def _walk(
-        self,
-        node,
-        code,
-        functions,
-        classes,
-        imports,
-    ):
-        if node.type == "function_definition":
-            functions.append({
-                "text": code[node.start_byte:node.end_byte],
-                "start_line": node.start_point[0] + 1,
-                "end_line": node.end_point[0] + 1,
-            })
-
-        elif node.type == "class_definition":
-            classes.append({
-                "text": code[node.start_byte:node.end_byte],
-                "start_line": node.start_point[0] + 1,
-                "end_line": node.end_point[0] + 1,
-            })
-
-        elif node.type in (
-            "import_statement",
-            "import_from_statement",
-        ):
-            imports.append(
-                code[node.start_byte:node.end_byte]
-            )
-
-        for child in node.children:
-            self._walk(
-                child,
-                code,
-                functions,
-                classes,
-                imports,
-            )

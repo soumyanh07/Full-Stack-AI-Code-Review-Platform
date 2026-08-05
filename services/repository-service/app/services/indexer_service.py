@@ -1,87 +1,155 @@
-from pathlib import Path
+from typing import List, Dict
+import uuid
 
-from app.services.parser_service import ParserService
 from app.services.embedding_service import EmbeddingService
 from app.services.qdrant_service import QdrantService
 
 
 class IndexerService:
+    """
+    Handles source code indexing pipeline.
 
-    EXCLUDED_DIRS = {
-        ".git",
-        "__pycache__",
-        "node_modules",
-        ".venv",
-        "venv",
-        "dist",
-        "build",
-        ".idea",
-        ".vscode",
-    }
+    Flow:
+    Source Code
+        ↓
+    Chunks
+        ↓
+    Embeddings
+        ↓
+    Qdrant Vector Database
+    """
+
 
     def __init__(self):
-        self.parser = ParserService()
-        self.embedding = EmbeddingService()
-        self.qdrant = QdrantService()
 
-    def index_repository(
+        self.embedding_service = EmbeddingService()
+
+        self.qdrant_service = QdrantService()
+
+
+
+    async def index_files(
         self,
-        repository_id: int,
-        repository_path: str,
-    ):
-        point_id = repository_id * 1_000_000
+        repository_id: str,
+        files: List[Dict]
+    ) -> Dict:
 
-        for file in Path(repository_path).rglob("*"):
 
-            if not file.is_file():
-                continue
+        indexed_chunks = 0
 
-            if any(
-                part in self.EXCLUDED_DIRS
-                for part in file.parts
-            ):
-                continue
 
-            text = self.parser.read_file(str(file))
+        points = []
 
-            if not text:
-                continue
 
-            chunks = self.chunk_text(text)
+        for file in files:
 
-            for chunk_no, chunk in enumerate(chunks):
 
-                embedding = self.embedding.generate_embedding(chunk)
+            chunks = file.get(
+                "chunks",
+                []
+            )
 
-                self.qdrant.store_embedding(
-                    point_id=point_id,
-                    embedding=embedding,
-                    payload={
-                        "repository_id": repository_id,
-                        "path": str(file),
-                        "chunk": chunk_no,
-                        "text": chunk,
-                    },
+
+            for chunk in chunks:
+
+
+                vector = await self.embedding_service.create_embedding(
+                    chunk["content"]
                 )
 
-                point_id += 1
 
-    def chunk_text(
+                point = {
+
+                    "id": str(uuid.uuid4()),
+
+                    "vector": vector,
+
+                    "payload": {
+
+                        "repository_id": repository_id,
+
+                        "file_path": file["path"],
+
+                        "language": file.get(
+                            "language",
+                            "unknown"
+                        ),
+
+                        "content": chunk["content"],
+
+                        "chunk_index": chunk.get(
+                            "index",
+                            0
+                        )
+                    }
+                }
+
+
+                points.append(point)
+
+                indexed_chunks += 1
+
+
+
+        if points:
+
+            await self.qdrant_service.upsert_points(
+                points
+            )
+
+
+        return {
+
+            "repository_id": repository_id,
+
+            "indexed_chunks": indexed_chunks,
+
+            "status": "completed"
+
+        }
+
+
+
+    async def index_single_file(
         self,
-        text: str,
-        chunk_size: int = 1000,
-        overlap: int = 200,
+        repository_id: str,
+        file_path: str,
+        content: str
     ):
-        chunks = []
 
-        start = 0
 
-        while start < len(text):
+        vector = await self.embedding_service.create_embedding(
+            content
+        )
 
-            end = min(start + chunk_size, len(text))
 
-            chunks.append(text[start:end])
+        point = {
 
-            start += chunk_size - overlap
+            "id": str(uuid.uuid4()),
 
-        return chunks
+            "vector": vector,
+
+            "payload": {
+
+                "repository_id": repository_id,
+
+                "file_path": file_path,
+
+                "content": content
+
+            }
+        }
+
+
+        await self.qdrant_service.upsert_points(
+            [point]
+        )
+
+
+        return {
+
+            "file": file_path,
+
+            "status": "indexed"
+
+        }

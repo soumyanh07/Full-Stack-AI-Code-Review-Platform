@@ -12,3 +12,5 @@ class EmbeddingService:
             text,
             normalize_embeddings=True,
         ).tolist()
+
+        

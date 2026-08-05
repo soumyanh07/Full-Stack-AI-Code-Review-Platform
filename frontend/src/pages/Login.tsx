@@ -14,7 +14,7 @@ function Login() {
     e.preventDefault();
 
     try {
-      const response = await api.post("/auth/login", {
+      const response = await api.post("http://localhost:8000/api/v1/auth/login", {
         email,
         password,
       });

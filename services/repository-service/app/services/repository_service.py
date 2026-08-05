@@ -1,53 +1,60 @@
-from sqlalchemy.orm import Session
+from __future__ import annotations
 
-from app.models.repository import Repository
-from app.schemas.repository import RepositoryCreate
-
-from app.services.github_service import GitHubService
-from app.services.indexer_service import IndexerService
+from app.clients.github_client import GitHubClient
 
 
 class RepositoryService:
+    """
+    Business logic for GitHub repositories.
+    """
 
-    def __init__(self, db: Session):
-        self.db = db
-        self.github = GitHubService()
-        self.indexer = IndexerService()
+    def __init__(self, token: str):
+        self.github = GitHubClient(token)
 
-    def create_repository(
+    async def get_current_user(self):
+        return await self.github.get_authenticated_user()
+
+    async def list_repositories(self):
+        return await self.github.get_repositories()
+
+    async def get_repository(
         self,
-        repository: RepositoryCreate,
+        owner: str,
+        repo: str,
     ):
-        # Clone repository
-        local_path = self.github.clone_repository(
-            repository.url
+        return await self.github.get_repository(
+            owner,
+            repo,
         )
 
-        # Save repository
-        db_repo = Repository(
-            name=repository.name,
-            url=repository.url,
-            local_path=local_path,
+    async def list_branches(
+        self,
+        owner: str,
+        repo: str,
+    ):
+        return await self.github.get_branches(
+            owner,
+            repo,
         )
 
-        self.db.add(db_repo)
-        self.db.commit()
-        self.db.refresh(db_repo)
-
-        # Automatically index the repository
-        self.indexer.index_repository(
-            repository_id=db_repo.id,
-            repository_path=local_path,
+    async def list_pull_requests(
+        self,
+        owner: str,
+        repo: str,
+    ):
+        return await self.github.get_pull_requests(
+            owner,
+            repo,
         )
 
-        return db_repo
-
-    def get_repository(self, repo_id: int):
-        return (
-            self.db.query(Repository)
-            .filter(Repository.id == repo_id)
-            .first()
+    async def list_files(
+        self,
+        owner: str,
+        repo: str,
+        path: str = "",
+    ):
+        return await self.github.get_contents(
+            owner,
+            repo,
+            path,
         )
-
-    def get_repositories(self):
-        return self.db.query(Repository).all()
