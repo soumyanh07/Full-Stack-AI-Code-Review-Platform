@@ -1,60 +1,86 @@
 from __future__ import annotations
 
-from app.clients.github_client import GitHubClient
+import os
+
+from sqlalchemy.orm import Session
+
+from app.models.repository import Repository
+from app.schemas.repository import RepositoryCreate
 
 
 class RepositoryService:
     """
-    Business logic for GitHub repositories.
+    Handles CRUD operations for repositories.
     """
 
-    def __init__(self, token: str):
-        self.github = GitHubClient(token)
+    REPOSITORY_ROOT = "./repositories"
 
-    async def get_current_user(self):
-        return await self.github.get_authenticated_user()
+    def __init__(self, db: Session):
+        self.db = db
 
-    async def list_repositories(self):
-        return await self.github.get_repositories()
-
-    async def get_repository(
-        self,
-        owner: str,
-        repo: str,
-    ):
-        return await self.github.get_repository(
-            owner,
-            repo,
+    def get_repositories(self):
+        """
+        Return all repositories.
+        """
+        return (
+            self.db.query(Repository)
+            .order_by(Repository.id.desc())
+            .all()
         )
 
-    async def list_branches(
+    def get_repository(
         self,
-        owner: str,
-        repo: str,
+        repo_id: int,
     ):
-        return await self.github.get_branches(
-            owner,
-            repo,
+        """
+        Return a single repository.
+        """
+        repository = (
+            self.db.query(Repository)
+            .filter(Repository.id == repo_id)
+            .first()
         )
 
-    async def list_pull_requests(
+        if repository is None:
+            raise ValueError("Repository not found.")
+
+        return repository
+
+    def create_repository(
         self,
-        owner: str,
-        repo: str,
+        repository: RepositoryCreate,
     ):
-        return await self.github.get_pull_requests(
-            owner,
-            repo,
+        """
+        Create a new repository.
+        """
+
+        existing = (
+            self.db.query(Repository)
+            .filter(Repository.url == repository.url)
+            .first()
         )
 
-    async def list_files(
-        self,
-        owner: str,
-        repo: str,
-        path: str = "",
-    ):
-        return await self.github.get_contents(
-            owner,
-            repo,
-            path,
+        if existing:
+            return existing
+
+        os.makedirs(
+            self.REPOSITORY_ROOT,
+            exist_ok=True,
         )
+
+        local_path = os.path.join(
+            self.REPOSITORY_ROOT,
+            repository.name,
+        )
+
+        db_repository = Repository(
+            name=repository.name,
+            url=repository.url,
+            local_path=local_path,
+        )
+
+        self.db.add(db_repository)
+        self.db.commit()
+        self.db.refresh(db_repository)
+
+        return db_repository

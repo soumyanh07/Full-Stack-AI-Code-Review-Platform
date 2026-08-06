@@ -1,54 +1,51 @@
 from app.services.embedding_service import EmbeddingService
 from app.services.qdrant_service import QdrantService
-from app.services.llm_service import LLMService
+from app.clients.ollama_client import OllamaClient
 
 
 class ChatService:
 
     def __init__(self):
+
         self.embedding = EmbeddingService()
         self.qdrant = QdrantService()
-        self.llm = LLMService()
+        self.ollama = OllamaClient()
 
     def chat(
         self,
         repository_id: int,
         question: str,
     ):
-        question_embedding = self.embedding.generate_embedding(
-            question
-        )
 
-        results = self.qdrant.search(
-            question_embedding,
+        # Generate embedding for the question
+        query_vector = self.embedding.embed_query(question)
+
+        # Search similar code chunks
+        results = self.qdrant.search_repository(
+            repository_id=repository_id,
+            vector=query_vector,
             limit=5,
         )
 
-        context = []
-        
-
-        for point in results:
-            payload = point.payload
-
-            if payload.get("repository_id") == repository_id:
-                context.append(payload["text"])
+        context = "\n\n".join(
+            [
+                hit.payload.get("content", "")
+                for hit in results
+            ]
+        )
 
         prompt = f"""
-You are a senior software engineer.
-
-Answer ONLY using the repository context below.
-
-If the answer is not present in the context, say:
-
-"I couldn't find that information in this repository."
+You are an expert software engineer.
 
 Repository Context:
 
-{chr(10).join(context)}
+{context}
 
 Question:
 
 {question}
+
+Answer clearly with references to the repository context.
 """
 
-        return self.llm.review(prompt)
+        return self.ollama.generate(prompt)
