@@ -1,104 +1,92 @@
-from typing import Dict, List
+from __future__ import annotations
 
-from app.services.github_client import GitHubClient
-from app.services.ai_review_client import AIReviewClient
+from app.clients.github_client import GitHubClient
+from app.services.review_service import ReviewService
 
 
 class PRReviewService:
     """
-    Handles complete Pull Request review workflow.
+    Reviews every changed file in a Pull Request.
     """
 
     def __init__(self):
         self.github = GitHubClient()
-        self.ai_review = AIReviewClient()
+        self.reviewer = ReviewService()
 
-
-    async def review_pull_request(
+    def review_pull_request(
         self,
-        owner: str,
-        repo: str,
-        pull_number: int,
-        token: str
-    ) -> Dict:
+        repository: str,
+        pr_number: int,
+    ) -> dict:
+        """
+        Review an entire Pull Request.
+        """
 
-
-        # 1. Get changed files from GitHub
-        changed_files = await self.github.get_pull_request_files(
-            owner,
-            repo,
-            pull_number,
-            token
+        files = self.github.get_pull_request_files(
+            repository=repository,
+            pr_number=pr_number,
         )
 
+        reviews = []
 
-        files = []
+        for file in files:
 
-        for file in changed_files:
+            filename = file.get("filename")
 
-            content = await self.github.get_file_content(
-                owner,
-                repo,
-                file["filename"],
-                token
+            patch = file.get("patch")
+
+            if not patch:
+                continue
+
+            result = self.reviewer.review_code(
+                code=patch,
+                language=self._detect_language(filename),
             )
 
-            files.append(
+            reviews.append(
                 {
-                    "path": file["filename"],
-                    "content": content,
-                    "language": self.detect_language(
-                        file["filename"]
-                    )
+                    "filename": filename,
+                    "review": result["review"],
                 }
             )
 
-
-        # 2. Send code to AI Review Service
-        review_result = await self.ai_review.review_repository(
-            files
-        )
-
-
-        # 3. Create GitHub review comment
-        await self.github.create_review_comment(
-            owner,
-            repo,
-            pull_number,
-            review_result,
-            token
-        )
-
-
         return {
-            "repository": f"{owner}/{repo}",
-            "pull_request": pull_number,
-            "status": "completed",
-            "review": review_result
+            "repository": repository,
+            "pull_request": pr_number,
+            "reviews": reviews,
         }
 
-
-
-    def detect_language(
+    def _detect_language(
         self,
-        filename: str
+        filename: str,
     ) -> str:
 
-        extension = filename.split(".")[-1]
+        extension = filename.split(".")[-1].lower()
 
-
-        languages = {
+        mapping = {
             "py": "python",
             "js": "javascript",
             "ts": "typescript",
+            "tsx": "typescript",
+            "jsx": "javascript",
             "java": "java",
             "cpp": "cpp",
+            "cc": "cpp",
+            "c": "c",
+            "cs": "csharp",
             "go": "go",
-            "rs": "rust"
+            "rs": "rust",
+            "php": "php",
+            "rb": "ruby",
+            "swift": "swift",
+            "kt": "kotlin",
+            "scala": "scala",
+            "html": "html",
+            "css": "css",
+            "json": "json",
+            "yaml": "yaml",
+            "yml": "yaml",
+            "sql": "sql",
         }
 
-
-        return languages.get(
-            extension,
-            "unknown"
-        )
+        return mapping.get(extension, "text")

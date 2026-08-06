@@ -19,14 +19,11 @@ class ReviewService:
         """
         Review a code snippet using Ollama.
         """
-
-        prompt = f"""
-You are a Senior Software Engineer.
+        prompt = f"""You are a Senior Software Engineer.
 
 Review the following {language} code.
 
 Focus on:
-
 1. Bugs
 2. Security Issues
 3. Performance
@@ -42,13 +39,18 @@ Code:
 
 ```{language}
 {code}
-```
+```"""
 
-"""
+        try:
+            review = self.ollama.generate(prompt).strip()
 
-        review = self.ollama.generate(prompt)
+            return {
+                "success": True,
+                "review": review,
+            }
 
-        return {
-            "success": True,
-            "review": review,
-        }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+            }
