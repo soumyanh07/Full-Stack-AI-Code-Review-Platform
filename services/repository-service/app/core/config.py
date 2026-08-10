@@ -29,7 +29,9 @@ class Settings(BaseSettings):
     # ==========================
     # JWT
     # ==========================
-    SECRET_KEY: str = "704ebd3cd433e4e48169e774ffe2ad8114766a38d346978600cf8c1c77984943"
+    SECRET_KEY: str = (
+        "704ebd3cd433e4e48169e774ffe2ad8114766a38d346978600cf8c1c77984943"
+    )
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
@@ -37,7 +39,7 @@ class Settings(BaseSettings):
     # GitHub
     # ==========================
     GITHUB_TOKEN: str
-    REPOSITORY_STORAGE: str = "./repositories"
+    REPOSITORY_STORAGE: str = "./storage/repositories"
 
     # ==========================
     # Ollama
@@ -50,22 +52,22 @@ class Settings(BaseSettings):
     # ==========================
     QDRANT_HOST: str = "localhost"
     QDRANT_PORT: int = 6333
-
-    
-
     QDRANT_COLLECTION: str = "repository_chunks"
-
-    EMBEDDING_DIMENSION: int = 384
 
     # ==========================
     # Embedding Model
     # ==========================
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
+    EMBEDDING_DIMENSION: int = 384
 
+    # ==========================
+    # Redis
+    # ==========================
     REDIS_URL: str = "redis://localhost:6379/0"
 
-
-
+    # ==========================
+    # Pydantic Settings
+    # ==========================
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -7,6 +7,9 @@ def index_repository(
     repository_id: int,
     repository_url: str,
 ):
+    """
+    Celery task for asynchronous repository indexing.
+    """
 
     service = IndexerService()
 

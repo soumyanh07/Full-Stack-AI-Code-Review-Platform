@@ -2,11 +2,16 @@ from celery import Celery
 
 from app.core.config import settings
 
+
 celery_app = Celery(
     "repository_service",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
+    include=[
+        "app.tasks.index_repository",
+    ],
 )
+
 
 celery_app.conf.update(
     task_serializer="json",
