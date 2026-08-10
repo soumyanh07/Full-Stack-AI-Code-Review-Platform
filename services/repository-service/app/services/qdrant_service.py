@@ -14,9 +14,11 @@ from app.core.config import settings
 
 
 class QdrantService:
+    """
+    Handles vector storage and semantic search using Qdrant.
+    """
 
     def __init__(self):
-
         self.client = QdrantClient(
             host=settings.QDRANT_HOST,
             port=settings.QDRANT_PORT,
@@ -27,6 +29,9 @@ class QdrantService:
         self._create_collection()
 
     def _create_collection(self):
+        """
+        Create the vector collection if it does not already exist.
+        """
 
         collections = [
             collection.name
@@ -34,7 +39,6 @@ class QdrantService:
         ]
 
         if self.collection not in collections:
-
             self.client.create_collection(
                 collection_name=self.collection,
                 vectors_config=VectorParams(
@@ -47,6 +51,9 @@ class QdrantService:
         self,
         points: list[PointStruct],
     ):
+        """
+        Insert or update vector points.
+        """
 
         self.client.upsert(
             collection_name=self.collection,
@@ -58,12 +65,17 @@ class QdrantService:
         vector: list[float],
         limit: int = 5,
     ):
+        """
+        Perform semantic vector search across all repositories.
+        """
 
-        return self.client.search(
+        response = self.client.query_points(
             collection_name=self.collection,
-            query_vector=vector,
+            query=vector,
             limit=limit,
         )
+
+        return response.points
 
     def search_repository(
         self,
@@ -71,11 +83,13 @@ class QdrantService:
         vector: list[float],
         limit: int = 5,
     ):
+        """
+        Perform semantic search restricted to one repository.
+        """
 
-        return self.client.search(
+        response = self.client.query_points(
             collection_name=self.collection,
-            query_vector=vector,
-            limit=limit,
+            query=vector,
             query_filter=Filter(
                 must=[
                     FieldCondition(
@@ -86,12 +100,18 @@ class QdrantService:
                     ),
                 ]
             ),
+            limit=limit,
         )
+
+        return response.points
 
     def delete_repository(
         self,
         repository_id: int,
     ):
+        """
+        Delete all vectors belonging to a repository.
+        """
 
         self.client.delete(
             collection_name=self.collection,
