@@ -29,14 +29,16 @@ class ReviewService:
             filename: Optional filename for additional context.
 
         Returns:
-            Dictionary containing the language, filename, and AI review.
+            Dictionary containing the structured AI review.
         """
 
         if not code or not code.strip():
             return {
                 "language": language,
                 "filename": filename,
-                "review": "No code was provided for review.",
+                "summary": "No code was provided for review.",
+                "score": 10,
+                "issues": [],
             }
 
         review = self.llm_service.review_code(
@@ -48,5 +50,7 @@ class ReviewService:
         return {
             "language": language,
             "filename": filename,
-            "review": review,
+            "summary": review.get("summary", ""),
+            "score": review.get("score", 0),
+            "issues": review.get("issues", []),
         }

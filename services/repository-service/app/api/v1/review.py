@@ -9,7 +9,6 @@ router = APIRouter(
     tags=["AI Review"],
 )
 
-
 review_service = ReviewService()
 
 
@@ -24,6 +23,7 @@ def review_code(
         return review_service.review(
             code=request.code,
             language=request.language,
+            filename=request.filename,
         )
 
     except Exception as exc:
