@@ -1,67 +1,78 @@
 from __future__ import annotations
 
-from app.clients.github_client import GitHubClient
+from app.services.github_api_service import GitHubAPIService
 from app.services.review_service import ReviewService
 
 
 class PRReviewService:
     """
-    Reviews every changed file in a Pull Request.
+    Reviews changed files in a GitHub Pull Request.
     """
 
     def __init__(self):
-        self.github = GitHubClient()
-        self.reviewer = ReviewService()
+        self.github = GitHubAPIService()
+        self.review = ReviewService()
 
-    def review_pull_request(
+    async def review_pull_request(
         self,
+        owner: str,
         repository: str,
-        pr_number: int,
-    ) -> dict:
-        """
-        Review an entire Pull Request.
-        """
+        pull_number: int,
+        token: str,
+    ) -> list[dict]:
 
-        files = self.github.get_pull_request_files(
+        files = await self.github.get_pull_request_files(
+            owner=owner,
             repository=repository,
-            pr_number=pr_number,
+            pull_number=pull_number,
+            token=token,
         )
 
-        reviews = []
+        results = []
 
         for file in files:
 
-            filename = file.get("filename")
+            filename = file.get(
+                "filename",
+                ""
+            )
 
-            patch = file.get("patch")
+            patch = file.get(
+                "patch"
+            )
 
             if not patch:
                 continue
 
-            result = self.reviewer.review_code(
+            language = self._detect_language(
+                filename
+            )
+
+            result = self.review.review(
                 code=patch,
-                language=self._detect_language(filename),
+                language=language,
+                filename=filename,
             )
 
-            reviews.append(
-                {
-                    "filename": filename,
-                    "review": result["review"],
-                }
+            results.append(
+                result
             )
 
-        return {
-            "repository": repository,
-            "pull_request": pr_number,
-            "reviews": reviews,
-        }
+        return results
 
     def _detect_language(
         self,
         filename: str,
     ) -> str:
 
-        extension = filename.split(".")[-1].lower()
+        extension = ""
+
+        if "." in filename:
+            extension = (
+                filename
+                .rsplit(".", 1)[-1]
+                .lower()
+            )
 
         mapping = {
             "py": "python",
@@ -71,22 +82,17 @@ class PRReviewService:
             "jsx": "javascript",
             "java": "java",
             "cpp": "cpp",
-            "cc": "cpp",
             "c": "c",
-            "cs": "csharp",
             "go": "go",
             "rs": "rust",
             "php": "php",
             "rb": "ruby",
-            "swift": "swift",
-            "kt": "kotlin",
-            "scala": "scala",
+            "sql": "sql",
             "html": "html",
             "css": "css",
-            "json": "json",
-            "yaml": "yaml",
-            "yml": "yaml",
-            "sql": "sql",
         }
 
-        return mapping.get(extension, "text")
+        return mapping.get(
+            extension,
+            "text",
+        )
