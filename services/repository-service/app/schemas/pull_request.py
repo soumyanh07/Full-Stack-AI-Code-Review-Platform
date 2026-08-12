@@ -1,6 +1,17 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PullRequestReviewRequest(BaseModel):
-    repository: str
-    pr_number: int
+    owner: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    repository: str = Field(
+        min_length=1,
+        max_length=200,
+    )
+
+    pr_number: int = Field(
+        gt=0,
+    )
