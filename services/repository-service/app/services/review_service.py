@@ -18,23 +18,35 @@ class ReviewService:
         self,
         code: str,
         language: str = "text",
+        filename: str | None = None,
     ) -> dict:
         """
         Review a piece of source code.
+
+        Args:
+            code: Source code to review.
+            language: Programming language of the source code.
+            filename: Optional filename for additional context.
+
+        Returns:
+            Dictionary containing the language, filename, and AI review.
         """
 
         if not code or not code.strip():
             return {
                 "language": language,
+                "filename": filename,
                 "review": "No code was provided for review.",
             }
 
         review = self.llm_service.review_code(
             code=code,
             language=language,
+            filename=filename,
         )
 
         return {
             "language": language,
+            "filename": filename,
             "review": review,
         }
