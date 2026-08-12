@@ -1,56 +1,40 @@
 from __future__ import annotations
 
-from app.clients.ollama_client import OllamaClient
+from app.services.llm_service import LLMService
 
 
 class ReviewService:
     """
     AI-powered code review service.
+
+    Sends source code to the configured LLM and returns
+    actionable software-engineering feedback.
     """
 
     def __init__(self):
-        self.ollama = OllamaClient()
+        self.llm_service = LLMService()
 
-    def review_code(
+    def review(
         self,
         code: str,
-        language: str = "python",
+        language: str = "text",
     ) -> dict:
         """
-        Review a code snippet using Ollama.
+        Review a piece of source code.
         """
-        prompt = f"""You are a Senior Software Engineer.
 
-Review the following {language} code.
-
-Focus on:
-1. Bugs
-2. Security Issues
-3. Performance
-4. Readability
-5. Maintainability
-6. Best Practices
-7. Code Smells
-8. Possible Improvements
-
-Return the response in Markdown.
-
-Code:
-
-```{language}
-{code}
-```"""
-
-        try:
-            review = self.ollama.generate(prompt).strip()
-
+        if not code or not code.strip():
             return {
-                "success": True,
-                "review": review,
+                "language": language,
+                "review": "No code was provided for review.",
             }
 
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-            }
+        review = self.llm_service.review_code(
+            code=code,
+            language=language,
+        )
+
+        return {
+            "language": language,
+            "review": review,
+        }

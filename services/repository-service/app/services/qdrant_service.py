@@ -29,10 +29,6 @@ class QdrantService:
         self._create_collection()
 
     def _create_collection(self):
-        """
-        Create the vector collection if it does not already exist.
-        """
-
         collections = [
             collection.name
             for collection in self.client.get_collections().collections
@@ -55,6 +51,9 @@ class QdrantService:
         Insert or update vector points.
         """
 
+        if not points:
+            return
+
         self.client.upsert(
             collection_name=self.collection,
             points=points,
@@ -66,16 +65,17 @@ class QdrantService:
         limit: int = 5,
     ):
         """
-        Perform semantic vector search across all repositories.
+        Global semantic search.
         """
 
-        response = self.client.query_points(
+        result = self.client.query_points(
             collection_name=self.collection,
             query=vector,
             limit=limit,
+            with_payload=True,
         )
 
-        return response.points
+        return result.points
 
     def search_repository(
         self,
@@ -84,12 +84,13 @@ class QdrantService:
         limit: int = 5,
     ):
         """
-        Perform semantic search restricted to one repository.
+        Semantic search restricted to one repository.
         """
 
-        response = self.client.query_points(
+        result = self.client.query_points(
             collection_name=self.collection,
             query=vector,
+            limit=limit,
             query_filter=Filter(
                 must=[
                     FieldCondition(
@@ -100,10 +101,10 @@ class QdrantService:
                     ),
                 ]
             ),
-            limit=limit,
+            with_payload=True,
         )
 
-        return response.points
+        return result.points
 
     def delete_repository(
         self,
@@ -126,3 +127,12 @@ class QdrantService:
                 ]
             ),
         )
+
+    def count(self) -> int:
+        """
+        Return total number of vectors.
+        """
+
+        return self.client.count(
+            collection_name=self.collection,
+        ).count

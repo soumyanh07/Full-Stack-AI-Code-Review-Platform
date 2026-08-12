@@ -1,51 +1,79 @@
-from app.services.embedding_service import EmbeddingService
-from app.services.qdrant_service import QdrantService
-from app.clients.ollama_client import OllamaClient
+from __future__ import annotations
+
+from app.services.llm_service import LLMService
+from app.services.rag_service import RAGService
 
 
 class ChatService:
+    """
+    Repository-aware AI chat service.
+
+    Flow:
+        User Question
+              ↓
+        RAGService
+              ↓
+        Relevant Repository Context
+              ↓
+        LLMService / Ollama
+              ↓
+        AI Answer
+    """
 
     def __init__(self):
-
-        self.embedding = EmbeddingService()
-        self.qdrant = QdrantService()
-        self.ollama = OllamaClient()
+        self.rag_service = RAGService()
+        self.llm_service = LLMService()
 
     def chat(
         self,
         repository_id: int,
         question: str,
-    ):
+        limit: int = 5,
+    ) -> dict:
+        """
+        Answer a question using repository context retrieved through RAG.
+        """
 
-        # Generate embedding for the question
-        query_vector = self.embedding.embed_query(question)
-
-        # Search similar code chunks
-        results = self.qdrant.search_repository(
+        # Retrieve relevant repository context.
+        context = self.rag_service.build_context(
             repository_id=repository_id,
-            vector=query_vector,
-            limit=5,
+            query=question,
+            limit=limit,
         )
 
-        context = "\n\n".join(
-            [
-                hit.payload.get("content", "")
-                for hit in results
-            ]
-        )
-
+        # Build the LLM prompt.
         prompt = f"""
-You are an expert software engineer.
+You are an AI software engineering assistant.
+
+Answer the user's question using the repository context provided below.
+
+Rules:
+
+1. Use the repository context as the primary source of truth.
+2. Do not invent files, code, or repository details.
+3. If the context does not contain enough information, clearly say so.
+4. Give a concise but useful answer.
+5. When discussing code, explain the relevant file and code behavior.
 
 Repository Context:
 
 {context}
 
-Question:
+User Question:
 
 {question}
 
-Answer clearly with references to the repository context.
-"""
+Answer:
+""".strip()
 
-        return self.ollama.generate(prompt)
+        # Generate the answer using Ollama.
+        answer = self.llm_service.generate(
+            prompt=prompt,
+        )
+
+        return {
+            "repository_id": repository_id,
+            "question": question,
+            "context": context,
+            "answer": answer,
+        }
