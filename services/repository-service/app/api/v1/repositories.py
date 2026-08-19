@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
+from app.database.session import SessionLocal
+from app.schemas.repository import RepositoryResponse
 from app.services.repository_service import RepositoryService
+
 
 router = APIRouter(
     prefix="/repositories",
@@ -8,70 +12,40 @@ router = APIRouter(
 )
 
 
-def get_token(authorization: str = Header(...)) -> str:
-    """
-    Extract GitHub access token from Authorization header.
-    Expected format:
-    Authorization: Bearer <token>
-    """
+def get_db():
+    db = SessionLocal()
 
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid Authorization header",
-        )
-
-    return authorization.split(" ", 1)[1]
+    try:
+        yield db
+    finally:
+        db.close()
 
 
-@router.get("")
+@router.get(
+    "",
+    response_model=list[RepositoryResponse],
+)
 async def list_repositories(
-    token: str = Header(..., alias="Authorization"),
+    db: Session = Depends(get_db),
 ):
-    service = RepositoryService(get_token(token))
-    return await service.list_repositories()
+    service = RepositoryService(db)
+    return service.get_repositories()
 
 
-@router.get("/{owner}/{repo}")
+@router.get(
+    "/{repo_id}",
+    response_model=RepositoryResponse,
+)
 async def repository_details(
-    owner: str,
-    repo: str,
-    token: str = Header(..., alias="Authorization"),
+    repo_id: int,
+    db: Session = Depends(get_db),
 ):
-    service = RepositoryService(get_token(token))
-    return await service.get_repository(owner, repo)
+    service = RepositoryService(db)
 
-
-@router.get("/{owner}/{repo}/branches")
-async def branches(
-    owner: str,
-    repo: str,
-    token: str = Header(..., alias="Authorization"),
-):
-    service = RepositoryService(get_token(token))
-    return await service.list_branches(owner, repo)
-
-
-@router.get("/{owner}/{repo}/pulls")
-async def pull_requests(
-    owner: str,
-    repo: str,
-    token: str = Header(..., alias="Authorization"),
-):
-    service = RepositoryService(get_token(token))
-    return await service.list_pull_requests(owner, repo)
-
-
-@router.get("/{owner}/{repo}/files")
-async def repository_files(
-    owner: str,
-    repo: str,
-    path: str = "",
-    token: str = Header(..., alias="Authorization"),
-):
-    service = RepositoryService(get_token(token))
-    return await service.list_files(
-        owner,
-        repo,
-        path,
-    )
+    try:
+        return service.get_repository(repo_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found.",
+        )
