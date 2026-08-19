@@ -1,52 +1,115 @@
 from __future__ import annotations
 
-from app.services.llm_service import LLMService
+from app.services.github_api_service import GitHubAPIService
+from app.services.review_service import ReviewService
 
 
-class ReviewService:
+class PRReviewService:
     """
-    AI-powered code review service.
+    AI-powered Pull Request review service.
 
-    Sends source code to the configured LLM and returns
-    actionable software-engineering feedback.
+    Fetches changed files from GitHub and sends their patches
+    through the AI code review pipeline.
     """
 
     def __init__(self):
-        self.llm_service = LLMService()
+        self.github = GitHubAPIService()
+        self.review_service = ReviewService()
 
-    def review(
+    async def review_pull_request(
         self,
-        code: str,
-        language: str = "text",
-        filename: str | None = None,
-    ) -> dict:
+        owner: str,
+        repository: str,
+        pull_number: int,
+    ) -> list[dict]:
         """
-        Review a piece of source code.
-
-        Args:
-            code: Source code to review.
-            language: Programming language of the source code.
-            filename: Optional source filename.
-
-        Returns:
-            Dictionary containing language, filename, and review.
+        Review all reviewable files changed in a Pull Request.
         """
 
-        if not code or not code.strip():
-            return {
-                "language": language,
-                "filename": filename,
-                "review": "No code was provided for review.",
-            }
-
-        review = self.llm_service.review_code(
-            code=code,
-            language=language,
-            filename=filename,
+        files = self.github.get_pull_request_files(
+            owner=owner,
+            repository=repository,
+            pull_number=pull_number,
         )
 
-        return {
-            "language": language,
-            "filename": filename,
-            "review": review,
+        results = []
+
+        for file in files:
+            filename = file.get(
+                "filename",
+                "",
+            )
+
+            patch = file.get(
+                "patch"
+            )
+
+            # GitHub does not provide patches for
+            # some binary or unsupported files.
+            if not patch:
+                continue
+
+            language = self._detect_language(
+                filename
+            )
+
+            result = self.review_service.review(
+                code=patch,
+                language=language,
+                filename=filename,
+            )
+
+            results.append(
+                result
+            )
+
+        return results
+
+    @staticmethod
+    def _detect_language(
+        filename: str,
+    ) -> str:
+        """
+        Detect programming language from filename extension.
+        """
+
+        extension = ""
+
+        if "." in filename:
+            extension = (
+                filename
+                .rsplit(".", 1)[-1]
+                .lower()
+            )
+
+        mapping = {
+            "py": "python",
+            "js": "javascript",
+            "ts": "typescript",
+            "tsx": "typescript",
+            "jsx": "javascript",
+            "java": "java",
+            "cpp": "cpp",
+            "cc": "cpp",
+            "cxx": "cpp",
+            "c": "c",
+            "h": "c",
+            "hpp": "cpp",
+            "go": "go",
+            "rs": "rust",
+            "php": "php",
+            "rb": "ruby",
+            "sql": "sql",
+            "html": "html",
+            "css": "css",
+            "scss": "scss",
+            "json": "json",
+            "yaml": "yaml",
+            "yml": "yaml",
+            "md": "markdown",
         }
+
+        return mapping.get(
+            extension,
+            "text",
+        )
