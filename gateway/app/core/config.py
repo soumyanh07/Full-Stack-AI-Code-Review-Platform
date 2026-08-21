@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     AI_SERVICE: str = "http://localhost:8004"
     CHAT_SERVICE: str = "http://localhost:8005"
 
+    # ==========================
+    # Pydantic Settings
+    # ==========================
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
