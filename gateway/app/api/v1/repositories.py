@@ -8,7 +8,17 @@ from app.utils.proxy import ProxyClient
 
 logger = logging.getLogger("gateway.repositories")
 
-router = APIRouter(tags=["Repositories"])
+router = APIRouter(
+    tags=["Repositories"],
+)
+
+
+def _auth_headers(request: Request) -> dict:
+    return {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() == "authorization"
+    }
 
 
 @router.get("/repositories")
@@ -17,17 +27,19 @@ async def list_repositories(request: Request):
         data, status = await ProxyClient.forward(
             method="GET",
             url=f"{settings.REPOSITORY_SERVICE}/api/v1/repositories",
-            headers={
-                key: value
-                for key, value in request.headers.items()
-                if key.lower() in {"authorization"}
-            },
+            headers=_auth_headers(request),
         )
 
-        return JSONResponse(status_code=status, content=data)
+        return JSONResponse(
+            status_code=status,
+            content=data,
+        )
 
     except Exception:
-        logger.exception("Unexpected error while proxying repository list")
+        logger.exception(
+            "Unexpected error while proxying repository list"
+        )
+
         return JSONResponse(
             status_code=500,
             content={"detail": "Internal gateway error"},
@@ -35,24 +47,30 @@ async def list_repositories(request: Request):
 
 
 @router.get("/repositories/{repo_id}")
-async def repository_details(repo_id: int, request: Request):
+async def repository_details(
+    repo_id: int,
+    request: Request,
+):
     try:
         data, status = await ProxyClient.forward(
             method="GET",
-            url=f"{settings.REPOSITORY_SERVICE}/api/v1/repositories/{repo_id}",
-            headers={
-                key: value
-                for key, value in request.headers.items()
-                if key.lower() in {"authorization"}
-            },
+            url=(
+                f"{settings.REPOSITORY_SERVICE}"
+                f"/api/v1/repositories/{repo_id}"
+            ),
+            headers=_auth_headers(request),
         )
 
-        return JSONResponse(status_code=status, content=data)
+        return JSONResponse(
+            status_code=status,
+            content=data,
+        )
 
     except Exception:
         logger.exception(
             "Unexpected error while proxying repository details"
         )
+
         return JSONResponse(
             status_code=500,
             content={"detail": "Internal gateway error"},
