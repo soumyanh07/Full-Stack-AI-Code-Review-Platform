@@ -1,27 +1,41 @@
 from __future__ import annotations
 
+from functools import lru_cache
+
 from sentence_transformers import SentenceTransformer
 
 from app.core.config import settings
 
 
+@lru_cache(maxsize=1)
+def get_embedding_model() -> SentenceTransformer:
+    """
+    Load the embedding model only once per process.
+    """
+    print(
+        f"Loading embedding model: "
+        f"{settings.EMBEDDING_MODEL}"
+    )
+
+    return SentenceTransformer(
+        settings.EMBEDDING_MODEL
+    )
+
+
 class EmbeddingService:
     """
-    Generates embeddings using the configured SentenceTransformer model.
+    Generates embeddings using the configured
+    SentenceTransformer model.
     """
 
     def __init__(self):
-        self.model = SentenceTransformer(
-            settings.EMBEDDING_MODEL
-        )
+        self.model = get_embedding_model()
 
     def embed(
         self,
         text: str,
     ) -> list[float]:
-        """
-        Generate embedding for a single text.
-        """
+
         vector = self.model.encode(
             text,
             normalize_embeddings=True,
@@ -33,9 +47,7 @@ class EmbeddingService:
         self,
         texts: list[str],
     ) -> list[list[float]]:
-        """
-        Generate embeddings for multiple texts.
-        """
+
         vectors = self.model.encode(
             texts,
             normalize_embeddings=True,
@@ -49,9 +61,7 @@ class EmbeddingService:
         self,
         query: str,
     ) -> list[float]:
-        """
-        Generate embedding for a user query.
-        """
+
         vector = self.model.encode(
             query,
             normalize_embeddings=True,

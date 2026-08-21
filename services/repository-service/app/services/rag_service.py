@@ -38,11 +38,16 @@ class RAGService:
         )
 
         if not results:
-            return "No relevant repository context found."
+            return (
+                "NO_RELEVANT_CONTEXT_FOUND"
+            )
 
         sections = []
 
-        for index, result in enumerate(results, start=1):
+        for index, result in enumerate(
+            results,
+            start=1,
+        ):
 
             sections.append(
                 f"""

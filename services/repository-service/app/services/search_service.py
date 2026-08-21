@@ -9,6 +9,9 @@ class SearchService:
     Performs semantic code search using embeddings and Qdrant.
     """
 
+    # Ignore results that are too weakly related to the question.
+    MIN_SIMILARITY = 0.55
+
     def __init__(self):
         self.embedding = EmbeddingService()
         self.qdrant = QdrantService()
@@ -23,9 +26,15 @@ class SearchService:
         if not query.strip():
             return []
 
-        query_vector = self.embedding.embed_query(
-            query
-        )
+        # ---------------------------------------------
+        # Step 1: Embed the user's question
+        # ---------------------------------------------
+
+        query_vector = self.embedding.embed_query(query)
+
+        # ---------------------------------------------
+        # Step 2: Search Qdrant
+        # ---------------------------------------------
 
         results = self.qdrant.search_repository(
             repository_id=repository_id,
@@ -35,12 +44,26 @@ class SearchService:
 
         output = []
 
+        # ---------------------------------------------
+        # Step 3: Convert Qdrant results
+        # ---------------------------------------------
+
         for result in results:
+
             payload = result.payload or {}
+
+            score = float(result.score)
+
+            # -----------------------------------------
+            # Ignore weak semantic matches
+            # -----------------------------------------
+
+            if score < self.MIN_SIMILARITY:
+                continue
 
             output.append(
                 {
-                    "score": float(result.score),
+                    "score": score,
                     "repository_id": payload.get(
                         "repository_id"
                     ),
