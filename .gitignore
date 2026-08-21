@@ -1,4 +1,13 @@
+# =========================
+# Environment
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
 # Python
+# =========================
 __pycache__/
 *.py[cod]
 *.pyo
@@ -6,88 +15,66 @@ __pycache__/
 .venv/
 venv/
 
+# =========================
 # Node
+# =========================
 node_modules/
 dist/
 build/
+npm-debug.log*
 
-# Environment
-.env
-.env.*
-
-# VS Code
+# =========================
+# IDE
+# =========================
 .vscode/
+.idea/
 
+# =========================
 # Logs
+# =========================
 *.log
 
-# Coverage
+# =========================
+# Testing / Coverage
+# =========================
+.pytest_cache/
 .coverage
 htmlcov/
 
-# Database
-*.db
-
-# Docker
-docker-data/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Pytest
-.pytest_cache/
-
-# Cache
-.cache/
-
-# Alembic
-alembic/versions/__pycache__/
-
-# MinIO
-minio-data/
-
-# Redis
-redis-data/
-
-# PostgreSQL
-postgres-data/
-
-# Grafana
-grafana-data/
-
-
-services/repository-service/repositories/
-.venv/
-__pycache__/
-*.pyc
-
-# Environment files
-.env
-.env.*
-!.env.example
-
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-
+# =========================
 # Databases
+# =========================
 *.db
 *.sqlite
 *.sqlite3
 
-# Local repository data
+# =========================
+# Local Repository Data
+# =========================
+services/repository-service/repositories/
 repositories/
 
-# Logs
-*.log
+# =========================
+# Docker / Local Data
+# =========================
+docker-data/
+minio-data/
+redis-data/
+postgres-data/
+grafana-data/
 
-# IDE
-.vscode/
-.idea/
+# =========================
+# Cache
+# =========================
+.cache/
 
+# =========================
+# Alembic
+# =========================
+alembic/versions/__pycache__/
+
+# =========================
 # OS
+# =========================
 .DS_Store
 Thumbs.db
