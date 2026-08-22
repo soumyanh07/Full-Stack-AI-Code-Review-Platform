@@ -142,61 +142,54 @@ class LLMService:
         )
 
         prompt = f"""
-You are a senior software engineer performing a precise code review.
+You are a senior code reviewer.
 
-Review ONLY the source code provided below.
+Review ONLY the code/diff provided below.
+Do not assume code exists outside the provided input.
+Do not invent bugs, security issues, or configuration problems.
 
-{filename_context}
-
+Filename: {filename or "unknown"}
 Language: {language}
 
-SOURCE CODE:
+CODE:
 ```{language}
 {code}
 ```
 
-Analyze ONLY the provided source code for:
+Check only for:
 
-Bugs and correctness issues
-Security vulnerabilities
-Performance problems
-Code quality and style
-Maintainability
-Best practices
+*  correctness bugs 
+*  real security vulnerabilities 
+*  performance problems 
+*  style problems that materially affect readability 
+*  maintainability problems 
+*  important best-practice violations 
 
-Return ONLY valid JSON.
+IMPORTANT:
 
-Use exactly this structure:
+*  Report an issue only when it is clearly supported by the provided code. 
+*  Do not report hypothetical problems. 
+*  Do not report SSL/TLS issues for localhost HTTP endpoints. 
+*  Do not claim a parameter is unused unless the provided code proves it. 
+*  Use the actual line number when possible. 
+*  Return at most 5 issues. 
+*  If there are no meaningful issues, return an empty issues array. 
+*  Score the code from 0 to 10. 
 
+Return ONLY valid JSON using exactly this structure:
 {{
-"summary": "Short overall assessment of the code.",
-"score": 0,
-"issues": [
-{{
-"severity": "critical",
-"category": "security",
-"line": 1,
-"message": "Clear explanation of the issue.",
-"suggestion": "Specific recommendation to fix it."
-}}
-]
-}}
-
-Rules:
-
-score must be an integer from 0 to 10.
-severity must be one of:
-critical, high, medium, low, info
-category must be one of:
-bug, security, performance, style, maintainability, best_practice
-line must be the relevant source-code line number when possible.
-Use null when a specific line cannot be identified.
-Do not invent issues.
-Do not review code that is not present.
-Keep issues concise and actionable.
-issues must always be an array.
-
-Return ONLY JSON.
+ "summary": "Short overall assessment.",
+ "score": 0,
+ "issues": [
+ {{
+ "severity": "critical|high|medium|low|info",
+ "category": "bug|security|performance|style|maintainability|best_practice",
+ "line": 1,
+ "message": "Specific issue supported by the code.",
+ "suggestion": "Specific fix."
+ }}
+ ]
+ }}
 """.strip()
 
         result = self.generate_json(

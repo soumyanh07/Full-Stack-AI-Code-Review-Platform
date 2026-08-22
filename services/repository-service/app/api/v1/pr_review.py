@@ -18,23 +18,16 @@ async def review_pull_request(
     request: PullRequestReviewRequest,
 ):
     """
-    Review changed files in a GitHub Pull Request.
+    Review changed files in a GitHub Pull Request
+    and publish the AI review to GitHub.
     """
 
     try:
-        results = await pr_review_service.review_pull_request(
+        return await pr_review_service.review_pull_request(
             owner=request.owner,
             repository=request.repository,
             pull_number=request.pr_number,
         )
-
-        return {
-            "owner": request.owner,
-            "repository": request.repository,
-            "pr_number": request.pr_number,
-            "files_reviewed": len(results),
-            "reviews": results,
-        }
 
     except Exception as exc:
         raise HTTPException(

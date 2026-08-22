@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     # GitHub
     # ==========================
     GITHUB_TOKEN: str
+    GITHUB_WEBHOOK_SECRET: str = ""
     REPOSITORY_STORAGE: str = "./storage/repositories"
 
     # ==========================

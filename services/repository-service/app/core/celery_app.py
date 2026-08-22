@@ -9,6 +9,7 @@ celery_app = Celery(
     backend=settings.REDIS_URL,
     include=[
         "app.tasks.index_repository",
+        "app.tasks.review_pull_request",
     ],
 )
 
