@@ -1,54 +1,17 @@
-from __future__ import annotations
-
-from app.clients.ollama_client import OllamaClient
+from app.clients.ai_client import AIClient
+from app.repositories.review_repository import ReviewRepository
 
 
 class ReviewService:
-    """
-    AI-powered code review service.
-    """
 
-    def __init__(self):
-        self.ollama = OllamaClient()
+    def __init__(self, db):
+        self.repository = ReviewRepository(db)
+        self.ai_client = AIClient()
 
-    def review_code(
-        self,
-        code: str,
-        language: str = "python",
-    ) -> dict:
-        """
-        Review a code snippet using Ollama.
-        """
+    def review_code(self, request):
+        review = self.ai_client.analyze(request.code)
 
-        prompt = f"""
-You are a Senior Software Engineer.
-
-Review the following {language} code.
-
-Focus on:
-
-1. Bugs
-2. Security Issues
-3. Performance
-4. Readability
-5. Maintainability
-6. Best Practices
-7. Code Smells
-8. Possible Improvements
-
-Return the response in Markdown.
-
-Code:
-
-```{language}
-{code}
-```
-
-"""
-
-        review = self.ollama.generate(prompt)
-
-        return {
-            "success": True,
-            "review": review,
-        }
+        return self.repository.create_review(
+            repository_id=request.repository_id,
+            review=review,
+        )

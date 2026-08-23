@@ -1,3 +1,4 @@
+
 import httpx
 
 from app.core.config import settings
@@ -12,7 +13,7 @@ class OllamaService:
     ) -> AnalyzeResponse:
 
         prompt = f"""
-You are an expert software engineer.
+You are an expert software engineer specializing in code review.
 
 Review the following Python code.
 
@@ -20,13 +21,15 @@ Code:
 
 {request.code}
 
-Provide:
+Provide a concise, practical code review with:
 
 1. Summary
 2. Bugs
 3. Improvements
 4. Best Practices
 5. Corrected Code
+
+Focus on real issues and avoid unnecessary explanation.
 """
 
         response = httpx.post(
@@ -35,8 +38,12 @@ Provide:
                 "model": settings.MODEL_NAME,
                 "prompt": prompt,
                 "stream": False,
+                "options": {
+                    "temperature": 0.2,
+                    "num_predict": 512,
+                },
             },
-            timeout=120,
+            timeout=300,
         )
 
         response.raise_for_status()

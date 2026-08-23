@@ -9,8 +9,18 @@ class SearchService:
     Performs semantic code search using embeddings and Qdrant.
     """
 
-    # Ignore results that are too weakly related to the question.
     MIN_SIMILARITY = 0.55
+
+    EXCLUDED_EXTENSIONS = {
+        ".md",
+        ".txt",
+        ".rst",
+    }
+
+    # Maximum number of chunks we allow from the same file.
+    # This improves questions that require understanding
+    # multiple parts of the same implementation file.
+    MAX_CHUNKS_PER_FILE = 1
 
     def __init__(self):
         self.embedding = EmbeddingService()
@@ -27,25 +37,28 @@ class SearchService:
             return []
 
         # ---------------------------------------------
-        # Step 1: Embed the user's question
+        # Step 1: Embed user question
         # ---------------------------------------------
 
         query_vector = self.embedding.embed_query(query)
 
         # ---------------------------------------------
-        # Step 2: Search Qdrant
+        # Step 2: Retrieve extra candidates
         # ---------------------------------------------
 
         results = self.qdrant.search_repository(
             repository_id=repository_id,
             vector=query_vector,
-            limit=limit,
+            limit=limit * 4,
         )
 
         output = []
 
+        # Track how many chunks came from each file.
+        file_chunk_counts: dict[str, int] = {}
+
         # ---------------------------------------------
-        # Step 3: Convert Qdrant results
+        # Step 3: Filter and deduplicate
         # ---------------------------------------------
 
         for result in results:
@@ -54,12 +67,34 @@ class SearchService:
 
             score = float(result.score)
 
-            # -----------------------------------------
-            # Ignore weak semantic matches
-            # -----------------------------------------
-
+            # Ignore weak matches.
             if score < self.MIN_SIMILARITY:
                 continue
+
+            path = payload.get("path") or ""
+
+            # Ignore documentation files.
+            if any(
+                path.lower().endswith(extension)
+                for extension in self.EXCLUDED_EXTENSIONS
+            ):
+                continue
+
+            normalized_path = path.lower()
+
+            current_count = file_chunk_counts.get(
+                normalized_path,
+                0,
+            )
+
+            # Allow up to two useful chunks from the same
+            # implementation file.
+            if current_count >= 1:
+                continue
+
+            file_chunk_counts[normalized_path] = (
+                current_count + 1
+            )
 
             output.append(
                 {
@@ -70,9 +105,7 @@ class SearchService:
                     "filename": payload.get(
                         "filename"
                     ),
-                    "path": payload.get(
-                        "path"
-                    ),
+                    "path": path,
                     "language": payload.get(
                         "language"
                     ),
@@ -84,5 +117,8 @@ class SearchService:
                     ),
                 }
             )
+
+            if len(output) >= limit:
+                break
 
         return output

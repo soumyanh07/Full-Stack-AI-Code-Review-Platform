@@ -13,6 +13,7 @@ class LLMService:
 
     Handles:
     - General text generation
+    - Structured JSON generation
     - Conversational chat
     - Structured AI code reviews
     """
@@ -21,13 +22,21 @@ class LLMService:
         self.base_url = settings.OLLAMA_URL.rstrip("/")
         self.model = settings.OLLAMA_MODEL
 
+    # =========================================================
+    # GENERAL GENERATION
+    # =========================================================
+
     def generate(
         self,
         prompt: str,
-        timeout: int = 300,
+        timeout: int = 180,
     ) -> str:
         """
         Generate text using Ollama's /api/generate endpoint.
+
+        Generation is intentionally bounded so the local LLM
+        does not spend several minutes producing unnecessarily
+        long responses.
         """
 
         response = requests.post(
@@ -36,8 +45,12 @@ class LLMService:
                 "model": self.model,
                 "prompt": prompt,
                 "stream": False,
+                "options": {
+                    "num_predict": 100,
+                    "temperature": 0.1,
+                },
             },
-            timeout=timeout,
+            timeout=180,
         )
 
         response.raise_for_status()
@@ -46,13 +59,19 @@ class LLMService:
 
         return data.get("response", "").strip()
 
+    # =========================================================
+    # JSON GENERATION
+    # =========================================================
+
     def generate_json(
         self,
         prompt: str,
-        timeout: int = 600,
+        timeout: int = 180,
     ) -> dict:
         """
         Generate structured JSON using Ollama.
+
+        Used primarily for AI code reviews.
         """
 
         response = requests.post(
@@ -62,6 +81,10 @@ class LLMService:
                 "prompt": prompt,
                 "stream": False,
                 "format": "json",
+                "options": {
+                    "num_predict": 350,
+                    "temperature": 0.2,
+                },
             },
             timeout=timeout,
         )
@@ -78,17 +101,28 @@ class LLMService:
             )
 
         try:
-            return json.loads(content)
+            result = json.loads(content)
 
         except json.JSONDecodeError as exc:
             raise ValueError(
                 f"Ollama returned invalid JSON: {content}"
             ) from exc
 
+        if not isinstance(result, dict):
+            raise ValueError(
+                "Ollama JSON response must be an object."
+            )
+
+        return result
+
+    # =========================================================
+    # CHAT
+    # =========================================================
+
     def chat(
         self,
         messages: list[dict],
-        timeout: int = 300,
+        timeout: int = 180,
     ) -> str:
         """
         Send a conversation to Ollama's /api/chat endpoint.
@@ -100,6 +134,10 @@ class LLMService:
                 "model": self.model,
                 "messages": messages,
                 "stream": False,
+                "options": {
+                    "num_predict": 200,
+                    "temperature": 0.2,
+                },
             },
             timeout=timeout,
         )
@@ -113,6 +151,10 @@ class LLMService:
             .get("content", "")
             .strip()
         )
+
+    # =========================================================
+    # CODE REVIEW
+    # =========================================================
 
     def review_code(
         self,
@@ -142,13 +184,15 @@ class LLMService:
         )
 
         prompt = f"""
-You are a senior code reviewer.
+You are a senior software engineer performing a code review.
 
-Review ONLY the code/diff provided below.
-Do not assume code exists outside the provided input.
-Do not invent bugs, security issues, or configuration problems.
+Review ONLY the code provided below.
 
-Filename: {filename or "unknown"}
+Do not assume that code exists outside the provided input.
+Do not invent bugs, security issues, configuration problems,
+dependencies, or behavior.
+
+{filename_context}
 Language: {language}
 
 CODE:
@@ -158,38 +202,42 @@ CODE:
 
 Check only for:
 
-*  correctness bugs 
-*  real security vulnerabilities 
-*  performance problems 
-*  style problems that materially affect readability 
-*  maintainability problems 
-*  important best-practice violations 
+- correctness bugs
+- real security vulnerabilities
+- performance problems
+- style problems that materially affect readability
+- maintainability problems
+- important best-practice violations
 
-IMPORTANT:
+IMPORTANT RULES:
 
-*  Report an issue only when it is clearly supported by the provided code. 
-*  Do not report hypothetical problems. 
-*  Do not report SSL/TLS issues for localhost HTTP endpoints. 
-*  Do not claim a parameter is unused unless the provided code proves it. 
-*  Use the actual line number when possible. 
-*  Return at most 5 issues. 
-*  If there are no meaningful issues, return an empty issues array. 
-*  Score the code from 0 to 10. 
+- Report an issue only when it is clearly supported by the
+  provided code.
+- Do not report hypothetical problems.
+- Do not report SSL/TLS issues for localhost HTTP endpoints.
+- Do not claim a parameter is unused unless the provided code
+  proves that it is unused.
+- Use the actual line number when possible.
+- Return at most 5 issues.
+- If there are no meaningful issues, return an empty issues array.
+- Score the code from 0 to 10.
+- The score should reflect the quality of the provided code.
 
 Return ONLY valid JSON using exactly this structure:
+
 {{
- "summary": "Short overall assessment.",
- "score": 0,
- "issues": [
- {{
- "severity": "critical|high|medium|low|info",
- "category": "bug|security|performance|style|maintainability|best_practice",
- "line": 1,
- "message": "Specific issue supported by the code.",
- "suggestion": "Specific fix."
- }}
- ]
- }}
+  "summary": "Short overall assessment.",
+  "score": 0,
+  "issues": [
+    {{
+      "severity": "critical|high|medium|low|info",
+      "category": "bug|security|performance|style|maintainability|best_practice",
+      "line": 1,
+      "message": "Specific issue supported by the code.",
+      "suggestion": "Specific fix."
+    }}
+  ]
+}}
 """.strip()
 
         result = self.generate_json(
@@ -197,14 +245,25 @@ Return ONLY valid JSON using exactly this structure:
             timeout=timeout,
         )
 
+        # -----------------------------------------------------
+        # Normalize summary
+        # -----------------------------------------------------
+
         summary = result.get(
             "summary",
             "No summary was generated.",
         )
 
-        score = result.get("score", 0)
+        summary = str(summary).strip()
 
-        issues = result.get("issues", [])
+        if not summary:
+            summary = "No summary was generated."
+
+        # -----------------------------------------------------
+        # Normalize score
+        # -----------------------------------------------------
+
+        score = result.get("score", 0)
 
         try:
             score = int(score)
@@ -212,6 +271,12 @@ Return ONLY valid JSON using exactly this structure:
             score = 0
 
         score = max(0, min(10, score))
+
+        # -----------------------------------------------------
+        # Normalize issues
+        # -----------------------------------------------------
+
+        issues = result.get("issues", [])
 
         if not isinstance(issues, list):
             issues = []
@@ -236,6 +301,7 @@ Return ONLY valid JSON using exactly this structure:
         normalized_issues = []
 
         for issue in issues:
+
             if not isinstance(issue, dict):
                 continue
 
@@ -249,15 +315,28 @@ Return ONLY valid JSON using exactly this structure:
                 "best_practice",
             )
 
+            # -------------------------------------------------
+            # Validate severity
+            # -------------------------------------------------
+
             if severity not in valid_severities:
                 severity = "info"
+
+            # -------------------------------------------------
+            # Validate category
+            # -------------------------------------------------
 
             if category not in valid_categories:
                 category = "best_practice"
 
+            # -------------------------------------------------
+            # Validate line number
+            # -------------------------------------------------
+
             line = issue.get("line")
 
             if line is not None:
+
                 try:
                     line = int(line)
 
@@ -267,12 +346,23 @@ Return ONLY valid JSON using exactly this structure:
                 except (TypeError, ValueError):
                     line = None
 
+            # -------------------------------------------------
+            # Normalize message
+            # -------------------------------------------------
+
             message = str(
                 issue.get(
                     "message",
                     "No issue description provided.",
                 )
             ).strip()
+
+            if not message:
+                continue
+
+            # -------------------------------------------------
+            # Normalize suggestion
+            # -------------------------------------------------
 
             suggestion = str(
                 issue.get(
@@ -281,11 +371,10 @@ Return ONLY valid JSON using exactly this structure:
                 )
             ).strip()
 
-            if not message:
-                continue
-
             if not suggestion:
-                suggestion = "Review and improve this code."
+                suggestion = (
+                    "Review and improve this code."
+                )
 
             normalized_issues.append(
                 {
@@ -297,8 +386,19 @@ Return ONLY valid JSON using exactly this structure:
                 }
             )
 
+            # -------------------------------------------------
+            # Hard limit
+            # -------------------------------------------------
+
+            if len(normalized_issues) >= 5:
+                break
+
+        # -----------------------------------------------------
+        # Final normalized result
+        # -----------------------------------------------------
+
         return {
-            "summary": str(summary).strip(),
+            "summary": summary,
             "score": score,
             "issues": normalized_issues,
         }
