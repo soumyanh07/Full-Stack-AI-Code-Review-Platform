@@ -21,6 +21,8 @@ class PRReviewService:
     GitHub Check Run
     """
 
+    MAX_PATCH_CHARS = 4000
+
     def __init__(self):
         self.github = GitHubAPIService()
         self.review_service = ReviewService()
@@ -36,6 +38,11 @@ class PRReviewService:
         and publish the result back to GitHub.
         """
 
+        print(
+            f"[PR REVIEW] Starting PR #{pull_number}: "
+            f"{owner}/{repository}"
+        )
+
         pull_request = self.github.get_pull_request(
             owner=owner,
             repository=repository,
@@ -50,9 +57,13 @@ class PRReviewService:
             pull_number=pull_number,
         )
 
+        print(
+            f"[PR REVIEW] Found {len(files)} changed files"
+        )
+
         results = []
 
-        for file in files:
+        for index, file in enumerate(files, start=1):
             filename = file.get(
                 "filename",
                 "",
@@ -63,16 +74,50 @@ class PRReviewService:
             # GitHub does not provide patches for
             # binary or unsupported files.
             if not patch:
+                print(
+                    f"[PR REVIEW] [{index}/{len(files)}] "
+                    f"Skipping {filename}: no patch"
+                )
                 continue
+
+            original_patch_size = len(patch)
+
+            # Large GitHub patches can take a very long time
+            # to process with a local CPU-based LLM.
+            if len(patch) > self.MAX_PATCH_CHARS:
+                patch = (
+                    patch[: self.MAX_PATCH_CHARS]
+                    + "\n\n"
+                    "[PATCH TRUNCATED FOR AI REVIEW]"
+                )
+
+                print(
+                    f"[PR REVIEW] [{index}/{len(files)}] "
+                    f"{filename}: patch reduced from "
+                    f"{original_patch_size} to "
+                    f"{len(patch)} chars"
+                )
 
             language = self._detect_language(
                 filename
+            )
+
+            print(
+                f"[PR REVIEW] [{index}/{len(files)}] "
+                f"Reviewing {filename} "
+                f"({language}, {len(patch)} chars)"
             )
 
             result = self.review_service.review(
                 code=patch,
                 language=language,
                 filename=filename,
+            )
+
+            print(
+                f"[PR REVIEW] [{index}/{len(files)}] "
+                f"Finished {filename} "
+                f"(score: {result.get('score', 0)}/10)"
             )
 
             results.append(
@@ -98,6 +143,11 @@ class PRReviewService:
                 }
             )
 
+        print(
+            f"[PR REVIEW] AI analysis finished. "
+            f"Files reviewed: {len(results)}"
+        )
+
         # --------------------------------------------------------
         # Build GitHub review summary
         # --------------------------------------------------------
@@ -109,6 +159,10 @@ class PRReviewService:
         # --------------------------------------------------------
         # Publish review to GitHub
         # --------------------------------------------------------
+
+        print(
+            "[PR REVIEW] Publishing GitHub PR review..."
+        )
 
         github_review = self.github.create_pull_request_review(
             owner=owner,
@@ -137,13 +191,49 @@ class PRReviewService:
             overall_score,
         )
 
-        github_check = self.github.create_check_run(
-            owner=owner,
-            repository=repository,
-            head_sha=head_sha,
-            title="AI Code Review",
-            summary=check_summary,
-            conclusion=conclusion,
+        print(
+            f"[PR REVIEW] Overall score: "
+            f"{overall_score}/10"
+        )
+
+        # --------------------------------------------------------
+        # Create GitHub Check Run
+        # --------------------------------------------------------
+
+        print(
+            "[PR REVIEW] Creating GitHub Check Run..."
+        )
+
+        try:
+            github_check = self.github.create_check_run(
+                owner=owner,
+                repository=repository,
+                head_sha=head_sha,
+                title="AI Code Review",
+                summary=check_summary,
+                conclusion=conclusion,
+            )
+
+            print(
+                "[PR REVIEW] GitHub Check Run created successfully"
+            )
+
+        except Exception as exc:
+            # Check Runs require GitHub App authentication.
+            # A failure here should not invalidate the AI review.
+            print(
+                "[PR REVIEW] Warning: GitHub Check Run "
+                f"could not be created: {exc}"
+            )
+
+            github_check = None
+
+        # --------------------------------------------------------
+        # Review completed
+        # --------------------------------------------------------
+
+        print(
+            f"[PR REVIEW] PR #{pull_number} completed successfully"
         )
 
         return {
