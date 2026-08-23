@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { useParams } from "react-router-dom";
 import { Send, Bot, User, Loader2 } from "lucide-react";
 import { chatWithRepository } from "../api/chat";
 
@@ -8,21 +9,21 @@ interface Message {
   content: string;
 }
 
-interface RepositoryChatProps {
-  repositoryId: number;
-}
+function RepositoryChatPage() {
+  const { repositoryId } = useParams<{ repositoryId: string }>();
 
-function RepositoryChat({ repositoryId }: RepositoryChatProps) {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const id = Number(repositoryId);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const trimmedQuestion = question.trim();
 
-    if (!trimmedQuestion || loading) {
+    if (!trimmedQuestion || loading || !Number.isFinite(id)) {
       return;
     }
 
@@ -39,7 +40,7 @@ function RepositoryChat({ repositoryId }: RepositoryChatProps) {
 
     try {
       const response = await chatWithRepository(
-        repositoryId,
+        id,
         trimmedQuestion
       );
 
@@ -66,111 +67,137 @@ function RepositoryChat({ repositoryId }: RepositoryChatProps) {
     }
   };
 
-  return (
-    <div className="flex h-[calc(100vh-140px)] flex-col rounded-2xl border border-gray-800 bg-gray-900">
-      <div className="border-b border-gray-800 px-6 py-4">
-        <h2 className="text-xl font-semibold text-white">
-          Chat with Repository
-        </h2>
+  if (!repositoryId || !Number.isFinite(id)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-950 text-white">
+        <div className="rounded-2xl border border-red-900 bg-gray-900 p-8 text-center">
+          <h1 className="text-xl font-semibold">
+            Invalid repository
+          </h1>
 
-        <p className="mt-1 text-sm text-gray-400">
-          Ask questions about the indexed codebase.
-        </p>
-      </div>
-
-      <div className="flex-1 space-y-4 overflow-y-auto p-6">
-        {messages.length === 0 && (
-          <div className="flex h-full items-center justify-center text-center">
-            <div>
-              <Bot className="mx-auto mb-3 h-10 w-10 text-gray-500" />
-
-              <p className="text-gray-400">
-                Ask a question about this repository.
-              </p>
-
-              <p className="mt-2 text-sm text-gray-600">
-                Example: What is FastAPI and how is the main application
-                created?
-              </p>
-            </div>
-          </div>
-        )}
-
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex gap-3 ${
-              message.role === "user" ? "justify-end" : "justify-start"
-            }`}
-          >
-            {message.role === "assistant" && (
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600">
-                <Bot className="h-4 w-4 text-white" />
-              </div>
-            )}
-
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-6 ${
-                message.role === "user"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-800 text-gray-200"
-              }`}
-            >
-              <div className="whitespace-pre-wrap">
-                {message.content}
-              </div>
-            </div>
-
-            {message.role === "user" && (
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-700">
-                <User className="h-4 w-4 text-gray-200" />
-              </div>
-            )}
-          </div>
-        ))}
-
-        {loading && (
-          <div className="flex gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600">
-              <Bot className="h-4 w-4 text-white" />
-            </div>
-
-            <div className="rounded-2xl bg-gray-800 px-4 py-3">
-              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <form
-        onSubmit={handleSubmit}
-        className="border-t border-gray-800 p-4"
-      >
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            placeholder="Ask something about the repository..."
-            disabled={loading}
-            className="flex-1 rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-blue-500"
-          />
-
-          <button
-            type="submit"
-            disabled={loading || !question.trim()}
-            className="flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Send className="h-5 w-5" />
-            )}
-          </button>
+          <p className="mt-2 text-sm text-gray-400">
+            The repository ID in the URL is invalid.
+          </p>
         </div>
-      </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col bg-gray-950 text-white">
+      <div className="border-b border-gray-800 bg-gray-900 px-6 py-5">
+        <div className="mx-auto max-w-6xl">
+          <h1 className="text-2xl font-semibold">
+            Repository AI Chat
+          </h1>
+
+          <p className="mt-1 text-sm text-gray-400">
+            Ask questions about repository #{id}
+          </p>
+        </div>
+      </div>
+
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-6">
+        <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-gray-800 bg-gray-900">
+          <div className="flex-1 space-y-4 overflow-y-auto p-6">
+            {messages.length === 0 && (
+              <div className="flex h-full items-center justify-center text-center">
+                <div>
+                  <Bot className="mx-auto mb-3 h-10 w-10 text-gray-500" />
+
+                  <p className="text-gray-300">
+                    Ask a question about this repository.
+                  </p>
+
+                  <p className="mt-2 max-w-md text-sm text-gray-600">
+                    Example: What is FastAPI and how is the main
+                    application created?
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {messages.map((message, index) => (
+              <div
+                key={index}
+                className={`flex gap-3 ${
+                  message.role === "user"
+                    ? "justify-end"
+                    : "justify-start"
+                }`}
+              >
+                {message.role === "assistant" && (
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600">
+                    <Bot className="h-4 w-4 text-white" />
+                  </div>
+                )}
+
+                <div
+                  className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-6 ${
+                    message.role === "user"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-800 text-gray-200"
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">
+                    {message.content}
+                  </div>
+                </div>
+
+                {message.role === "user" && (
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-700">
+                    <User className="h-4 w-4 text-gray-200" />
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {loading && (
+              <div className="flex gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600">
+                  <Bot className="h-4 w-4 text-white" />
+                </div>
+
+                <div className="rounded-2xl bg-gray-800 px-4 py-3">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <form
+            onSubmit={handleSubmit}
+            className="border-t border-gray-800 p-4"
+          >
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={question}
+                onChange={(event) =>
+                  setQuestion(event.target.value)
+                }
+                placeholder="Ask something about the repository..."
+                disabled={loading}
+                className="flex-1 rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-blue-500"
+              />
+
+              <button
+                type="submit"
+                disabled={loading || !question.trim()}
+                className="flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
 
-export default RepositoryChat;
+export default RepositoryChatPage;

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { getRepositories } from "../api/repositories";
 import type { Repository } from "../api/repositories";
 
@@ -88,7 +89,7 @@ function Dashboard() {
               {repositories.map((repository) => (
                 <div
                   key={repository.id}
-                  className="rounded-xl border border-gray-700 bg-gray-800 p-6 transition hover:border-gray-500 hover:bg-gray-750"
+                  className="rounded-xl border border-gray-700 bg-gray-800 p-6 transition hover:border-gray-500"
                 >
                   <div className="mb-4">
                     <h3 className="text-xl font-semibold">
@@ -104,19 +105,22 @@ function Dashboard() {
                     {repository.url}
                   </p>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">
-                      Indexed repository
-                    </span>
-
+                  <div className="flex items-center justify-between gap-3">
                     <a
                       href={repository.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium transition hover:bg-blue-500"
+                      className="rounded-lg border border-gray-600 px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-gray-500 hover:bg-gray-700"
                     >
                       GitHub
                     </a>
+
+                    <Link
+                      to={`/repositories/${repository.id}/chat`}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+                    >
+                      AI Chat
+                    </Link>
                   </div>
                 </div>
               ))}

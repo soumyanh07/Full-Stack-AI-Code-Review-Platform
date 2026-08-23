@@ -16,6 +16,9 @@ class GitHubAPIService:
     """
 
     def __init__(self):
+        if not settings.GITHUB_TOKEN:
+            raise ValueError("GITHUB_TOKEN is not configured.")
+
         self.github = Github(settings.GITHUB_TOKEN)
 
     # ============================================================
@@ -25,12 +28,6 @@ class GitHubAPIService:
     def clone_repository(self, repo_url: str) -> str:
         """
         Clone a GitHub repository into a temporary directory.
-
-        Args:
-            repo_url: GitHub repository URL.
-
-        Returns:
-            Path to the cloned repository.
         """
 
         temp_dir = tempfile.mkdtemp()
@@ -68,6 +65,24 @@ class GitHubAPIService:
     # Pull Request Operations
     # ============================================================
 
+    def get_pull_request(
+        self,
+        owner: str,
+        repository: str,
+        pull_number: int,
+    ):
+        """
+        Return a GitHub Pull Request object.
+        """
+
+        repo = self.github.get_repo(
+            f"{owner}/{repository}"
+        )
+
+        return repo.get_pull(
+            pull_number
+        )
+
     def get_pull_request_files(
         self,
         owner: str,
@@ -76,22 +91,12 @@ class GitHubAPIService:
     ) -> list[dict]:
         """
         Get files changed by a GitHub Pull Request.
-
-        Args:
-            owner: GitHub repository owner.
-            repository: Repository name.
-            pull_number: Pull Request number.
-
-        Returns:
-            List of changed files with filename, status and patch.
         """
 
-        repo = self.github.get_repo(
-            f"{owner}/{repository}"
-        )
-
-        pull_request = repo.get_pull(
-            pull_number
+        pull_request = self.get_pull_request(
+            owner=owner,
+            repository=repository,
+            pull_number=pull_number,
         )
 
         files = []
@@ -109,3 +114,82 @@ class GitHubAPIService:
             )
 
         return files
+
+    # ============================================================
+    # Pull Request Review
+    # ============================================================
+
+    def create_pull_request_review(
+        self,
+        owner: str,
+        repository: str,
+        pull_number: int,
+        body: str,
+        event: str = "COMMENT",
+    ) -> dict:
+        """
+        Post an AI-generated review to a GitHub Pull Request.
+
+        event can be:
+        - COMMENT
+        - APPROVE
+        - REQUEST_CHANGES
+        """
+
+        pull_request = self.get_pull_request(
+            owner=owner,
+            repository=repository,
+            pull_number=pull_number,
+        )
+
+        review = pull_request.create_review(
+            body=body,
+            event=event,
+        )
+
+        return {
+            "id": review.id,
+            "url": review.html_url,
+            "state": review.state,
+        }
+
+    # ============================================================
+    # GitHub Checks
+    # ============================================================
+
+    def create_check_run(
+        self,
+        owner: str,
+        repository: str,
+        head_sha: str,
+        title: str,
+        summary: str,
+        conclusion: str = "success",
+        name: str = "AI Code Review",
+    ) -> dict:
+        """
+        Create a GitHub Check Run for an AI review.
+        """
+
+        repo = self.github.get_repo(
+            f"{owner}/{repository}"
+        )
+
+        check = repo.create_check_run(
+            name=name,
+            head_sha=head_sha,
+            status="completed",
+            conclusion=conclusion,
+            output={
+                "title": title,
+                "summary": summary,
+            },
+        )
+
+        return {
+            "id": check.id,
+            "url": check.html_url,
+            "name": check.name,
+            "status": check.status,
+            "conclusion": check.conclusion,
+        }
