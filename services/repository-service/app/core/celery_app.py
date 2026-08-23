@@ -10,6 +10,7 @@ celery_app = Celery(
     include=[
         "app.tasks.index_repository",
         "app.tasks.review_pull_request",
+
     ],
 )
 

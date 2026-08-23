@@ -1,31 +1,29 @@
 from __future__ import annotations
 
-from app.services.embedding_service import EmbeddingService
+from app.services.rag_service import RAGService
 from app.services.llm_service import LLMService
-from app.services.qdrant_service import QdrantService
 
 
 class ChatService:
     """
     Repository-aware AI chat service.
 
-    Uses:
+    Flow:
         Question
-            ↓
+            ?
         Embedding
-            ↓
-        Qdrant semantic search
-            ↓
+            ?
+        Semantic search
+            ?
         Repository context
-            ↓
+            ?
         Ollama LLM
-            ↓
+            ?
         Answer
     """
 
     def __init__(self):
-        self.embedding = EmbeddingService()
-        self.qdrant = QdrantService()
+        self.rag = RAGService()
         self.llm = LLMService()
 
     def chat(
@@ -38,72 +36,35 @@ class ChatService:
         """
 
         # -------------------------------------------------
-        # Step 1: Convert the question into an embedding
+        # Step 1: Retrieve relevant repository context
         # -------------------------------------------------
-        query_vector = self.embedding.embed_query(
-            question
-        )
 
-        # -------------------------------------------------
-        # Step 2: Search the repository in Qdrant
-        # -------------------------------------------------
-        results = self.qdrant.search_repository(
+        context = self.rag.build_context(
             repository_id=repository_id,
-            vector=query_vector,
+            query=question,
             limit=5,
         )
 
         # -------------------------------------------------
-        # Step 3: Build context from retrieved chunks
+        # Step 2: Handle missing repository context
         # -------------------------------------------------
-        context_parts = []
 
-        for result in results:
-            payload = result.payload or {}
-
-            filename = payload.get(
-                "filename",
-                "unknown",
-            )
-
-            path = payload.get(
-                "path",
-                "",
-            )
-
-            content = payload.get(
-                "content",
-                "",
-            )
-
-            context_parts.append(
-                f"File: {filename}\n"
-                f"Path: {path}\n"
-                f"Content:\n{content}"
-            )
-
-        context = "\n\n---\n\n".join(
-            context_parts
-        )
-
-        # -------------------------------------------------
-        # Step 4: Handle repository with no indexed data
-        # -------------------------------------------------
-        if not context:
+        if context == "NO_RELEVANT_CONTEXT_FOUND":
             return {
                 "repository_id": repository_id,
                 "question": question,
                 "answer": (
-                    "I could not find any indexed code "
-                    "for this repository. Please index "
-                    "the repository before asking questions."
+                    "I could not find any relevant indexed code "
+                    "for this repository. Please index the repository "
+                    "before asking questions."
                 ),
-                "context": "",
+                "context": context,
             }
 
         # -------------------------------------------------
-        # Step 5: Build the RAG prompt
+        # Step 3: Build RAG prompt
         # -------------------------------------------------
+
         prompt = f"""
 You are an AI coding assistant helping a developer
 understand a software repository.
@@ -111,13 +72,12 @@ understand a software repository.
 Answer the user's question using ONLY the repository
 context provided below.
 
-If the answer cannot be determined from the provided
-context, clearly say that the available repository
-context does not contain enough information.
-
-Do not invent files, functions, classes, APIs, or
-implementation details that are not present in the
-context.
+Rules:
+- Do not invent files, functions, classes, APIs, or implementation details.
+- Mention the relevant file paths when explaining the answer.
+- If the context is insufficient, clearly say so.
+- Prefer explaining the actual implementation over generic framework knowledge.
+- Keep the answer concise but technically accurate.
 
 Repository context:
 
@@ -131,15 +91,17 @@ Provide a clear and technically accurate answer.
 """.strip()
 
         # -------------------------------------------------
-        # Step 6: Ask Ollama
+        # Step 4: Ask Ollama
         # -------------------------------------------------
+
         answer = self.llm.generate(
             prompt=prompt
         )
 
         # -------------------------------------------------
-        # Step 7: Return structured response
+        # Step 5: Return structured response
         # -------------------------------------------------
+
         return {
             "repository_id": repository_id,
             "question": question,
