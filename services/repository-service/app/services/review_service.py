@@ -9,40 +9,53 @@ class ReviewService:
         self.llm = LLMService()
 
     def review(self, query: str, limit: int = 5):
-
-        # Retrieve relevant code chunks
+        # First try to retrieve repository context.
         results = self.search.search(
             query=query,
             limit=limit,
         )
 
-        # Build context from retrieved chunks
         context = "\n\n".join(
             point.payload["text"]
             for point in results
+            if point.payload.get("text")
         )
 
-        prompt = f"""
-You are a senior software engineer.
+        # For PR reviews, the GitHub patch itself is the
+        # authoritative source. If semantic search finds
+        # nothing, review the supplied patch directly.
+        if not context.strip():
+            context = query
 
-Review the following source code.
+        prompt = f"""
+You are a senior software engineer performing a GitHub pull-request review.
+
+Review the following Git diff / source code carefully.
 
 Focus on:
+- Bugs and logic errors
+- Security vulnerabilities
+- Performance problems
+- Error handling
+- Clean code
+- Maintainability
+- Best practices
 
-- Bugs
-- Security
-- Performance
-- Clean Code
-- Best Practices
+Important:
+- Analyze the actual code provided below.
+- Do not say that source code was not provided.
+- If the code is correct, explicitly say so.
+- Distinguish real problems from optional improvements.
 
 Provide:
+
 1. Summary
 2. Bugs
 3. Security Issues
 4. Performance Improvements
 5. Code Quality Suggestions
 
-Source Code:
+GitHub Diff / Source Code:
 
 {context}
 """
