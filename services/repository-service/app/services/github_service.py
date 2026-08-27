@@ -1,31 +1,103 @@
-import os
+from __future__ import annotations
+
 import shutil
-import stat
 from pathlib import Path
 
-from git import Repo
+from git import Repo, GitCommandError
+
+from app.core.config import settings
 
 
 class GitHubService:
+    """
+    Handles cloning and updating Git repositories.
+    """
 
-    CLONE_DIRECTORY = Path("repositories")
+    def __init__(self):
+        self.base_path = Path(settings.REPOSITORY_STORAGE)
 
-    @staticmethod
-    def _remove_readonly(func, path, exc_info):
-        os.chmod(path, stat.S_IWRITE)
-        func(path)
+        self.base_path.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
 
-    def clone_repository(self, url: str):
+    def repository_path(
+        self,
+        owner: str,
+        repository: str,
+    ) -> Path:
+        return self.base_path / owner / repository
 
-        self.CLONE_DIRECTORY.mkdir(exist_ok=True)
+    def clone_repository(
+        self,
+        clone_url: str,
+        owner: str,
+        repository: str,
+    ) -> Path:
 
-        repository_name = url.rstrip("/").split("/")[-1]
+        repo_path = self.repository_path(
+            owner,
+            repository,
+        )
 
-        destination = self.CLONE_DIRECTORY / repository_name
+        if repo_path.exists():
+            return repo_path
 
-        if destination.exists():
-            shutil.rmtree(destination, onerror=self._remove_readonly)
+        repo_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
 
-        Repo.clone_from(url, destination)
+        Repo.clone_from(
+            clone_url,
+            repo_path,
+        )
 
-        return str(destination)
+        return repo_path
+
+    def pull_repository(
+        self,
+        owner: str,
+        repository: str,
+    ) -> Path:
+
+        repo_path = self.repository_path(
+            owner,
+            repository,
+        )
+
+        if not repo_path.exists():
+            raise FileNotFoundError(
+                "Repository not cloned."
+            )
+
+        repo = Repo(repo_path)
+
+        repo.remotes.origin.pull()
+
+        return repo_path
+
+    def delete_repository(
+        self,
+        owner: str,
+        repository: str,
+    ):
+
+        repo_path = self.repository_path(
+            owner,
+            repository,
+        )
+
+        if repo_path.exists():
+            shutil.rmtree(repo_path)
+
+    def repository_exists(
+        self,
+        owner: str,
+        repository: str,
+    ) -> bool:
+
+        return self.repository_path(
+            owner,
+            repository,
+        ).exists()

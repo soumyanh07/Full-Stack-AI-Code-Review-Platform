@@ -1,55 +1,35 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter
 
-from app.dependencies.database import get_db
-from app.schemas.repository import (
-    RepositoryCreate,
-    RepositoryResponse,
-)
-from app.services.repository_service import RepositoryService
+from app.api.v1.repositories import router as repositories_router
+from app.api.v1.webhook import router as webhook_router
+from app.api.v1.search import router as search_router
+from app.api.v1.review import router as review_router
+from app.api.v1.chat import router as chat_router
+from app.api.v1.pr_review import router as pr_review_router
 
 router = APIRouter()
 
 
-@router.get("/")
-def root():
-    return {
-        "service": "Repository Service",
-        "status": "running",
-    }
-
-
-@router.get(
-    "/repositories",
-    response_model=list[RepositoryResponse],
+router.include_router(
+    repositories_router,
 )
-def get_repositories(
-    db: Session = Depends(get_db),
-):
-    service = RepositoryService(db)
-    return service.get_repositories()
 
-
-@router.post(
-    "/repositories",
-    response_model=RepositoryResponse,
-    status_code=201,
+router.include_router(
+    webhook_router,
 )
-def create_repository(
-    repository: RepositoryCreate,
-    db: Session = Depends(get_db),
-):
-    service = RepositoryService(db)
-    return service.create_repository(repository)
 
-
-@router.get(
-    "/repositories/{repo_id}",
-    response_model=RepositoryResponse,
+router.include_router(
+    search_router,
 )
-def get_repository(
-    repo_id: int,
-    db: Session = Depends(get_db),
-):
-    service = RepositoryService(db)
-    return service.get_repository(repo_id)
+
+router.include_router(
+    review_router,
+)
+
+router.include_router(
+    chat_router,
+)
+
+router.include_router(
+    pr_review_router,
+)

@@ -31,18 +31,16 @@ class AuthService:
         )
 
     def login(self, email: str, password: str) -> Token:
-
         user = self.user_repository.get_by_email(email)
 
         if user is None:
             raise ValueError("Invalid email or password")
 
-        # model stores hashed password in `hashed_password`
         if not verify_password(password, user.hashed_password):
             raise ValueError("Invalid email or password")
 
         access_token = create_access_token(
-            {"sub": user.email}
+            data={"sub": str(user.id), "email": user.email}
         )
 
         return Token(

@@ -1,63 +1,86 @@
-from fastapi import HTTPException
+from __future__ import annotations
 
-from app.repositories.repository_repository import RepositoryRepository
-from app.services.file_service import FileService
-from app.services.github_service import GitHubService
-from app.services.indexing_service import IndexingService
+import os
+
+from sqlalchemy.orm import Session
+
+from app.models.repository import Repository
+from app.schemas.repository import RepositoryCreate
 
 
 class RepositoryService:
+    """
+    Handles CRUD operations for repositories.
+    """
 
-    def __init__(self, db):
-        self.repository = RepositoryRepository(db)
-        self.github = GitHubService()
-        self.file_service = FileService()
-        self.indexing = IndexingService(db)
+    REPOSITORY_ROOT = "./repositories"
 
-    def create_repository(self, repository):
+    def __init__(self, db: Session):
+        self.db = db
 
-        existing = self.repository.get_by_url(repository.url)
+    def get_repositories(self):
+        """
+        Return all repositories.
+        """
+        return (
+            self.db.query(Repository)
+            .order_by(Repository.id.desc())
+            .all()
+        )
+
+    def get_repository(
+        self,
+        repo_id: int,
+    ):
+        """
+        Return a single repository.
+        """
+        repository = (
+            self.db.query(Repository)
+            .filter(Repository.id == repo_id)
+            .first()
+        )
+
+        if repository is None:
+            raise ValueError("Repository not found.")
+
+        return repository
+
+    def create_repository(
+        self,
+        repository: RepositoryCreate,
+    ):
+        """
+        Create a new repository.
+        """
+
+        existing = (
+            self.db.query(Repository)
+            .filter(Repository.url == repository.url)
+            .first()
+        )
 
         if existing:
-            raise HTTPException(
-                status_code=409,
-                detail="Repository already exists.",
-            )
+            return existing
 
-        # Clone GitHub repository
-        local_path = self.github.clone_repository(repository.url)
+        os.makedirs(
+            self.REPOSITORY_ROOT,
+            exist_ok=True,
+        )
 
-        # Save repository in PostgreSQL
-        repo = self.repository.create_repository(
+        local_path = os.path.join(
+            self.REPOSITORY_ROOT,
+            repository.name,
+        )
+
+        db_repository = Repository(
             name=repository.name,
             url=repository.url,
             local_path=local_path,
         )
 
-        # Scan repository files
-        files = self.file_service.scan_repository(local_path)
+        self.db.add(db_repository)
+        self.db.commit()
+        self.db.refresh(db_repository)
 
-        print("=" * 60)
-        print("Repository:", local_path)
-        print("Files found:", len(files))
-
-        for f in files[:10]:
-            print(f)
-
-        print("=" * 60)
-
-        # Index files
-        indexed = self.indexing.index_repository(
-            repo.id,
-            files,
-        )
-
-        print("Indexed:", indexed)
-
-        return repo
-
-    def get_repositories(self):
-        return self.repository.get_all()
-
-    def get_repository(self, repo_id: int):
-        return self.repository.get_by_id(repo_id)
+        return db_repository

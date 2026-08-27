@@ -1,29 +1,84 @@
-from pathlib import Path
+from __future__ import annotations
 
-from app.utils.file_utils import (
-    is_supported_file,
-    should_ignore,
-)
+from pathlib import Path
 
 
 class FileService:
+    """
+    Scans repositories and returns source code files.
+    """
 
-    def scan_repository(self, repository_path: str):
-        repository = Path(repository_path)
+    IGNORE_DIRS = {
+        ".git",
+        ".github",
+        ".venv",
+        "venv",
+        "__pycache__",
+        "node_modules",
+        "dist",
+        "build",
+        ".idea",
+        ".vscode",
+        ".next",
+        ".pytest_cache",
+    }
+
+    IGNORE_SUFFIXES = {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".svg",
+        ".ico",
+        ".pdf",
+        ".zip",
+        ".tar",
+        ".gz",
+        ".exe",
+        ".dll",
+        ".so",
+        ".class",
+        ".jar",
+        ".pyc",
+    }
+
+    def scan_repository(
+        self,
+        repository_path: str,
+    ) -> list[Path]:
+
+        root = Path(repository_path)
 
         files = []
 
-        for file in repository.rglob("*"):
+        for file in root.rglob("*"):
 
-            if file.is_dir():
+            if not file.is_file():
                 continue
 
-            if should_ignore(file):
+            if any(part in self.IGNORE_DIRS for part in file.parts):
                 continue
 
-            if not is_supported_file(file):
+            if file.suffix.lower() in self.IGNORE_SUFFIXES:
                 continue
 
-            files.append(str(file))
+            files.append(file)
 
-        return files
+        return sorted(files)
+
+    def read_file(
+        self,
+        path: Path,
+    ) -> str:
+
+        return path.read_text(
+            encoding="utf-8",
+            errors="ignore",
+        )
+
+    def file_extension(
+        self,
+        path: Path,
+    ) -> str:
+
+        return path.suffix.lower()

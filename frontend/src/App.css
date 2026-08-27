@@ -1,0 +1,90 @@
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.08), transparent 30%),
+    radial-gradient(circle at 90% 10%, rgba(6, 182, 212, 0.06), transparent 28%),
+    #070b14;
+}
+
+.glass {
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  box-shadow:
+    0 20px 70px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(18px);
+}
+
+.glass-hover {
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.glass-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(129, 140, 248, 0.3);
+  box-shadow:
+    0 25px 70px rgba(0, 0, 0, 0.28),
+    0 0 35px rgba(99, 102, 241, 0.06);
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, #a5b4fc, #67e8f9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.grid-pattern {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(30, 41, 59, 0.8),
+    rgba(51, 65, 85, 0.45),
+    rgba(30, 41, 59, 0.8)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes floatIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-float-in {
+  animation: floatIn 450ms ease-out both;
+}
+
+.dot-grid {
+  background-image: radial-gradient(
+    rgba(148, 163, 184, 0.18) 1px,
+    transparent 1px
+  );
+  background-size: 18px 18px;
+}

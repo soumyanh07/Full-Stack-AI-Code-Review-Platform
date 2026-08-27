@@ -1,3 +1,4 @@
+from app.dependencies.auth import get_current_user
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.schemas.token import LoginRequest, Token
@@ -56,6 +57,8 @@ def login(
     request: LoginRequest,
     db: Session = Depends(get_db),
 ):
+    
+
     auth_service = AuthService(db)
 
     try:
@@ -68,4 +71,12 @@ def login(
         raise HTTPException(
             status_code=401,
             detail=str(e),
-        )    
+        )
+@router.get("/auth/me")
+def get_me(
+    current_user=Depends(get_current_user),
+):
+    return {
+        "message": "JWT is working",
+        "user": current_user,
+    }

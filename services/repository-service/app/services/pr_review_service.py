@@ -1,0 +1,473 @@
+from __future__ import annotations
+
+from app.services.github_api_service import GitHubAPIService
+from app.services.review_service import ReviewService
+
+
+class PRReviewService:
+    """
+    AI-powered Pull Request review service.
+
+    Flow:
+
+    GitHub PR
+        ↓
+    Changed files
+        ↓
+    AI code review
+        ↓
+    GitHub PR review
+        ↓
+    GitHub Check Run
+    """
+
+    MAX_PATCH_CHARS = 4000
+
+    def __init__(self):
+        self.github = GitHubAPIService()
+        self.review_service = ReviewService()
+
+    async def review_pull_request(
+        self,
+        owner: str,
+        repository: str,
+        pull_number: int,
+    ) -> dict:
+        """
+        Review all reviewable files changed in a Pull Request
+        and publish the result back to GitHub.
+        """
+
+        print(
+            f"[PR REVIEW] Starting PR #{pull_number}: "
+            f"{owner}/{repository}"
+        )
+
+        pull_request = self.github.get_pull_request(
+            owner=owner,
+            repository=repository,
+            pull_number=pull_number,
+        )
+
+        head_sha = pull_request.head.sha
+
+        files = self.github.get_pull_request_files(
+            owner=owner,
+            repository=repository,
+            pull_number=pull_number,
+        )
+
+        print(
+            f"[PR REVIEW] Found {len(files)} changed files"
+        )
+
+        results = []
+
+        for index, file in enumerate(files, start=1):
+            filename = file.get(
+                "filename",
+                "",
+            )
+
+            patch = file.get("patch")
+
+            # GitHub does not provide patches for
+            # binary or unsupported files.
+            if not patch:
+                print(
+                    f"[PR REVIEW] [{index}/{len(files)}] "
+                    f"Skipping {filename}: no patch"
+                )
+                continue
+
+            original_patch_size = len(patch)
+
+            # Large GitHub patches can take a very long time
+            # to process with a local CPU-based LLM.
+            if len(patch) > self.MAX_PATCH_CHARS:
+                patch = (
+                    patch[: self.MAX_PATCH_CHARS]
+                    + "\n\n"
+                    "[PATCH TRUNCATED FOR AI REVIEW]"
+                )
+
+                print(
+                    f"[PR REVIEW] [{index}/{len(files)}] "
+                    f"{filename}: patch reduced from "
+                    f"{original_patch_size} to "
+                    f"{len(patch)} chars"
+                )
+
+            language = self._detect_language(
+                filename
+            )
+
+            print(
+                f"[PR REVIEW] [{index}/{len(files)}] "
+                f"Reviewing {filename} "
+                f"({language}, {len(patch)} chars)"
+            )
+
+            result = self.review_service.review(
+                code=patch,
+                language=language,
+                filename=filename,
+            )
+
+            print(
+                f"[PR REVIEW] [{index}/{len(files)}] "
+                f"Finished {filename} "
+                f"(score: {result.get('score', 0)}/10)"
+            )
+
+            results.append(
+                {
+                    "filename": filename,
+                    "status": file.get(
+                        "status",
+                        "modified",
+                    ),
+                    "language": language,
+                    "summary": result.get(
+                        "summary",
+                        "",
+                    ),
+                    "score": result.get(
+                        "score",
+                        0,
+                    ),
+                    "issues": result.get(
+                        "issues",
+                        [],
+                    ),
+                }
+            )
+
+        print(
+            f"[PR REVIEW] AI analysis finished. "
+            f"Files reviewed: {len(results)}"
+        )
+
+        # --------------------------------------------------------
+        # Build GitHub review summary
+        # --------------------------------------------------------
+
+        review_body = self._build_review_body(
+            results
+        )
+
+        # --------------------------------------------------------
+        # Publish review to GitHub
+        # --------------------------------------------------------
+
+        print(
+            "[PR REVIEW] Publishing GitHub PR review..."
+        )
+
+        github_review = self.github.create_pull_request_review(
+            owner=owner,
+            repository=repository,
+            pull_number=pull_number,
+            body=review_body,
+            event="COMMENT",
+        )
+
+        # --------------------------------------------------------
+        # Calculate overall result
+        # --------------------------------------------------------
+
+        overall_score = self._calculate_overall_score(
+            results
+        )
+
+        conclusion = (
+            "success"
+            if overall_score >= 7
+            else "failure"
+        )
+
+        check_summary = self._build_check_summary(
+            results,
+            overall_score,
+        )
+
+        print(
+            f"[PR REVIEW] Overall score: "
+            f"{overall_score}/10"
+        )
+
+        # --------------------------------------------------------
+        # Create GitHub Check Run
+        # --------------------------------------------------------
+
+        print(
+            "[PR REVIEW] Creating GitHub Check Run..."
+        )
+
+        try:
+            github_check = self.github.create_check_run(
+                owner=owner,
+                repository=repository,
+                head_sha=head_sha,
+                title="AI Code Review",
+                summary=check_summary,
+                conclusion=conclusion,
+            )
+
+            print(
+                "[PR REVIEW] GitHub Check Run created successfully"
+            )
+
+        except Exception as exc:
+            # Check Runs require GitHub App authentication.
+            # A failure here should not invalidate the AI review.
+            print(
+                "[PR REVIEW] Warning: GitHub Check Run "
+                f"could not be created: {exc}"
+            )
+
+            github_check = None
+
+        # --------------------------------------------------------
+        # Review completed
+        # --------------------------------------------------------
+
+        print(
+            f"[PR REVIEW] PR #{pull_number} completed successfully"
+        )
+
+        return {
+            "owner": owner,
+            "repository": repository,
+            "pr_number": pull_number,
+            "head_sha": head_sha,
+            "files_reviewed": len(results),
+            "overall_score": overall_score,
+            "reviews": results,
+            "github_review": github_review,
+            "github_check": github_check,
+        }
+
+    # ============================================================
+    # Review Formatting
+    # ============================================================
+
+    @staticmethod
+    def _build_review_body(
+        results: list[dict],
+    ) -> str:
+        """
+        Build a Markdown review comment.
+        """
+
+        if not results:
+            return (
+                "## 🤖 AI Code Review\n\n"
+                "No reviewable source files were found "
+                "in this Pull Request."
+            )
+
+        lines = [
+            "## 🤖 AI Code Review",
+            "",
+            "Automated review generated by the "
+            "AI Code Review Platform.",
+            "",
+        ]
+
+        for result in results:
+            lines.append(
+                f"### `{result['filename']}`"
+            )
+
+            lines.append(
+                f"**Score:** "
+                f"{result['score']}/10"
+            )
+
+            lines.append("")
+
+            lines.append(
+                result["summary"]
+            )
+
+            lines.append("")
+
+            issues = result.get(
+                "issues",
+                [],
+            )
+
+            if issues:
+                lines.append(
+                    "**Issues:**"
+                )
+
+                for issue in issues:
+                    severity = issue.get(
+                        "severity",
+                        "info",
+                    )
+
+                    category = issue.get(
+                        "category",
+                        "best_practice",
+                    )
+
+                    line = issue.get(
+                        "line"
+                    )
+
+                    message = issue.get(
+                        "message",
+                        "",
+                    )
+
+                    suggestion = issue.get(
+                        "suggestion",
+                        "",
+                    )
+
+                    location = (
+                        f"line {line}"
+                        if line is not None
+                        else "location unavailable"
+                    )
+
+                    lines.append(
+                        f"- **{severity.upper()}** "
+                        f"({category}, {location}): "
+                        f"{message}"
+                    )
+
+                    if suggestion:
+                        lines.append(
+                            f"  - 💡 {suggestion}"
+                        )
+
+                lines.append("")
+
+            else:
+                lines.append(
+                    "✅ No issues detected."
+                )
+
+                lines.append("")
+
+        lines.extend(
+            [
+                "---",
+                "",
+                "Generated by the "
+                "**Full-Stack AI Code Review Platform**.",
+            ]
+        )
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def _build_check_summary(
+        results: list[dict],
+        overall_score: int,
+    ) -> str:
+        """
+        Build the summary shown in the GitHub Check Run.
+        """
+
+        total_issues = sum(
+            len(
+                result.get(
+                    "issues",
+                    [],
+                )
+            )
+            for result in results
+        )
+
+        return (
+            f"## AI Code Review\n\n"
+            f"**Overall score:** "
+            f"{overall_score}/10\n\n"
+            f"**Files reviewed:** "
+            f"{len(results)}\n\n"
+            f"**Issues found:** "
+            f"{total_issues}\n\n"
+            f"The Pull Request was analyzed using "
+            f"the configured local AI model."
+        )
+
+    @staticmethod
+    def _calculate_overall_score(
+        results: list[dict],
+    ) -> int:
+        """
+        Calculate the average review score.
+        """
+
+        if not results:
+            return 10
+
+        scores = [
+            result.get(
+                "score",
+                0,
+            )
+            for result in results
+        ]
+
+        return round(
+            sum(scores) / len(scores)
+        )
+
+    # ============================================================
+    # Language Detection
+    # ============================================================
+
+    @staticmethod
+    def _detect_language(
+        filename: str,
+    ) -> str:
+        """
+        Detect programming language from filename extension.
+        """
+
+        extension = ""
+
+        if "." in filename:
+            extension = (
+                filename
+                .rsplit(".", 1)[-1]
+                .lower()
+            )
+
+        mapping = {
+            "py": "python",
+            "js": "javascript",
+            "ts": "typescript",
+            "tsx": "typescript",
+            "jsx": "javascript",
+            "java": "java",
+            "cpp": "cpp",
+            "cc": "cpp",
+            "cxx": "cpp",
+            "c": "c",
+            "h": "c",
+            "hpp": "cpp",
+            "go": "go",
+            "rs": "rust",
+            "php": "php",
+            "rb": "ruby",
+            "sql": "sql",
+            "html": "html",
+            "css": "css",
+            "scss": "scss",
+            "json": "json",
+            "yaml": "yaml",
+            "yml": "yaml",
+            "md": "markdown",
+        }
+
+        return mapping.get(
+            extension,
+            "text",
+        )

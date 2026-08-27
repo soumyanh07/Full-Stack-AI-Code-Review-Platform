@@ -1,55 +1,56 @@
+from __future__ import annotations
+
 from app.services.llm_service import LLMService
-from app.services.search_service import SearchService
 
 
 class ReviewService:
+    """
+    AI-powered code review service.
+
+    Sends source code to the configured LLM and returns
+    actionable software-engineering feedback.
+    """
 
     def __init__(self):
-        self.search = SearchService()
-        self.llm = LLMService()
+        self.llm_service = LLMService()
 
-    def review(self, query: str, limit: int = 5):
+    def review(
+        self,
+        code: str,
+        language: str = "text",
+        filename: str | None = None,
+    ) -> dict:
+        """
+        Review a piece of source code.
 
-        # Retrieve relevant code chunks
-        results = self.search.search(
-            query=query,
-            limit=limit,
+        Args:
+            code: Source code to review.
+            language: Programming language of the source code.
+            filename: Optional filename for additional context.
+
+        Returns:
+            Dictionary containing the structured AI review.
+        """
+
+        if not code or not code.strip():
+            return {
+                "language": language,
+                "filename": filename,
+                "summary": "No code was provided for review.",
+                "score": 10,
+                "issues": [],
+            }
+
+        review = self.llm_service.review_code(
+            code=code,
+            language=language,
+            filename=filename,
         )
-
-        # Build context from retrieved chunks
-        context = "\n\n".join(
-            point.payload["text"]
-            for point in results
-        )
-
-        prompt = f"""
-You are a senior software engineer.
-
-Review the following source code.
-
-Focus on:
-
-- Bugs
-- Security
-- Performance
-- Clean Code
-- Best Practices
-
-Provide:
-1. Summary
-2. Bugs
-3. Security Issues
-4. Performance Improvements
-5. Code Quality Suggestions
-
-Source Code:
-
-{context}
-"""
-
-        review = self.llm.review(prompt)
 
         return {
-            "review": review,
-            "chunks": len(results),
+            "language": language,
+            "filename": filename,
+            "summary": review.get("summary", ""),
+            "score": review.get("score", 0),
+            "issues": review.get("issues", []),
         }
