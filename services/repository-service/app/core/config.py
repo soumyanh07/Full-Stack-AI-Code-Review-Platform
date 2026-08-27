@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+﻿from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     AUTH_SERVICE: str
 
     GITHUB_TOKEN: str
+
+    # GitHub App configuration
+    GITHUB_APP_ID: int
+    GITHUB_APP_PRIVATE_KEY_PATH: str
+    GITHUB_APP_INSTALLATION_ID: int
 
     model_config = SettingsConfigDict(
         env_file=".env",
