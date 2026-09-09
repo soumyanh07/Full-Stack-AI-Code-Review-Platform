@@ -16,16 +16,25 @@ class ProxyClient:
         params: Optional[dict] = None,
         timeout: float = 5.0,
     ) -> tuple[dict | list | Any, int]:
+
         request_headers = dict(headers or {})
+
         if body is not None and "content-type" not in {
-            key.lower(): value for key, value in request_headers.items()
+            key.lower(): value
+            for key, value in request_headers.items()
         }:
             request_headers["content-type"] = "application/json"
 
         try:
             async with httpx.AsyncClient(
-                timeout=httpx.Timeout(connect=timeout, read=timeout, write=timeout, pool=timeout)
+                timeout=httpx.Timeout(
+                    connect=timeout,
+                    read=timeout,
+                    write=timeout,
+                    pool=timeout,
+                )
             ) as client:
+
                 response = await client.request(
                     method=method,
                     url=url,
@@ -37,13 +46,37 @@ class ProxyClient:
                 try:
                     payload = response.json()
                 except ValueError:
-                    payload = {"detail": response.text or "Empty response from auth service"}
+                    payload = {
+                        "detail": response.text
+                        or "Empty response from upstream service"
+                    }
 
-                logger.info("Proxy %s %s -> %s", method.upper(), url, response.status_code)
+                logger.info(
+                    "Proxy %s %s -> %s",
+                    method.upper(),
+                    url,
+                    response.status_code,
+                )
+
                 return payload, response.status_code
+
         except httpx.TimeoutException:
-            logger.exception("Proxy request to %s timed out", url)
-            return {"detail": "Auth service request timed out"}, 504
+            logger.exception(
+                "Proxy request to %s timed out after %s seconds",
+                url,
+                timeout,
+            )
+
+            return {
+                "detail": "Upstream service request timed out"
+            }, 504
+
         except httpx.RequestError as exc:
-            logger.exception("Proxy request to %s failed", url)
-            return {"detail": f"Unable to reach auth service: {exc}"}, 502
+            logger.exception(
+                "Proxy request to %s failed",
+                url,
+            )
+
+            return {
+                "detail": f"Unable to reach upstream service: {exc}"
+            }, 502
