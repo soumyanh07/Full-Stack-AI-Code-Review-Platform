@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Sparkles,
   Terminal,
+  GitPullRequest,
 } from "lucide-react";
 import Navbar from "../components/Navbar";
 import { getRepositories } from "../api/repositories";
@@ -127,6 +128,43 @@ function Dashboard() {
             })}
           </section>
 
+          {/* AI PR Review */}
+          <section className="mb-8 overflow-hidden rounded-3xl border border-indigo-500/15 bg-gradient-to-br from-indigo-500/[0.10] via-violet-500/[0.05] to-transparent">
+            <div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/15 ring-1 ring-indigo-400/20">
+                  <GitPullRequest className="h-6 w-6 text-indigo-400" />
+                </div>
+
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold">
+                      AI Pull Request Review
+                    </h2>
+
+                    <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-emerald-400">
+                      Ready
+                    </span>
+                  </div>
+
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                    Analyze GitHub pull requests with AI and receive
+                    structured code-quality, bug, security, and best-practice
+                    feedback.
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                to="/pull-request/review"
+                className="group flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400"
+              >
+                Review a Pull Request
+                <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+            </div>
+          </section>
+
           <section className="glass mb-8 overflow-hidden rounded-3xl">
             <div className="border-b border-white/[0.06] p-6 sm:p-7">
               <div className="flex items-center justify-between">
@@ -152,6 +190,7 @@ function Dashboard() {
             {loading && (
               <div className="p-12 text-center">
                 <Loader2 className="mx-auto h-7 w-7 animate-spin text-indigo-400" />
+
                 <p className="mt-3 text-sm text-slate-500">
                   Loading repositories...
                 </p>
@@ -161,6 +200,7 @@ function Dashboard() {
             {!loading && error && (
               <div className="m-6 rounded-2xl border border-red-500/15 bg-red-500/[0.06] p-6">
                 <p className="font-medium text-red-300">{error}</p>
+
                 <button
                   onClick={loadRepositories}
                   className="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300 hover:bg-red-500/20"
@@ -228,6 +268,7 @@ function Dashboard() {
                       >
                         <Bot className="h-4 w-4" />
                         Open AI Chat
+
                         <ArrowUpRight className="h-3.5 w-3.5 transition group-hover/button:translate-x-0.5 group-hover/button:-translate-y-0.5" />
                       </Link>
 
@@ -236,7 +277,7 @@ function Dashboard() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
-                        title="Open GitBranch"
+                        title="Open GitHub repository"
                       >
                         <ExternalLink className="h-4 w-4" />
                       </a>
@@ -281,4 +322,3 @@ function Dashboard() {
 }
 
 export default Dashboard;
-

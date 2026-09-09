@@ -4,6 +4,7 @@ import Login from "../pages/Login";
 import Register from "../pages/Register";
 import Dashboard from "../pages/Dashboard";
 import RepositoryChatPage from "../pages/RepositoryChatPage";
+import PRReviewPage from "../pages/PRReviewPage";
 
 function AppRoutes() {
   return (
@@ -20,6 +21,11 @@ function AppRoutes() {
         <Route
           path="/repositories/:repositoryId/chat"
           element={<RepositoryChatPage />}
+        />
+
+        <Route
+          path="/pull-request/review"
+          element={<PRReviewPage />}
         />
       </Routes>
     </BrowserRouter>
