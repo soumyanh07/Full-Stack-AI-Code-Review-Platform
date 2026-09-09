@@ -240,10 +240,50 @@ Return ONLY valid JSON using exactly this structure:
 }}
 """.strip()
 
-        result = self.generate_json(
-            prompt=prompt,
-            timeout=timeout,
-        )
+        try:
+            result = self.generate_json(
+                prompt=prompt,
+                timeout=timeout,
+            )
+        except ValueError:
+            retry_prompt = f"""
+Return ONLY one valid JSON object.
+
+No markdown.
+No explanation.
+No text before or after the JSON.
+Do not repeat any JSON key.
+
+Required structure:
+
+{{
+  "summary": "Short overall assessment.",
+  "score": 0,
+  "issues": []
+}}
+
+Rules:
+- score must be an integer from 0 to 10
+- issues must be an array
+- maximum 5 issues
+- each issue must contain:
+  severity, category, line, message, suggestion
+- only report issues directly supported by the supplied code
+
+Filename: {filename or "not provided"}
+Language: {language}
+
+CODE:
+```{language}
+{code}
+```
+
+""".strip()
+
+            result = self.generate_json(
+                prompt=retry_prompt,
+                timeout=timeout,
+            )
 
         # -----------------------------------------------------
         # Normalize summary
