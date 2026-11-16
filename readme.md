@@ -213,7 +213,7 @@ The backend integrates with:
                  ▼                   ▼                   ▼
         ┌────────────────┐  ┌────────────────┐  ┌────────────────┐
         │ Auth Service   │  │ Repository     │  │ API / Chat     │
-        │     :8001      │  │ Service :8002  │  │    Routes      │
+        │     :8001      │  │ Service :8000  │  │    Routes      │
         └────────────────┘  └───────┬────────┘  └────────────────┘
                                     │
                        ┌────────────┼─────────────┐
@@ -362,9 +362,19 @@ cd Full-Stack-AI-Code-Review-Platform
 
 ## ⚙️ Environment Configuration
 
-Each service uses environment variables.
+Each service uses environment variables. For Docker Compose, copy the safe template
+and replace its placeholders before starting the services:
 
-Create the required `.env` files according to the service configuration.
+```sh
+cp .env.example .env
+# Edit .env and replace the database password, JWT secret, and GitHub credentials.
+docker compose up --build
+```
+
+Set `ENVIRONMENT=production` only after replacing all placeholders with real
+deployment values. Production startup rejects a missing, weak, or placeholder JWT
+secret. The gateway and auth service receive the same `SECRET_KEY` and `ALGORITHM`
+from this file.
 
 Typical configuration includes:
 
@@ -491,6 +501,12 @@ npm run dev
 ------------------------------------------------------------------------
 
 ## 🌐 Local Service URLs
+
+These URLs are for services started directly on the host. Docker Compose publishes
+the gateway on `8000`, auth on `8001`, AI on `8002`, repository on `8003`, and
+review on `8004`; the repository, AI, and review containers listen on port `8000`.
+Gateway-to-service traffic uses Docker service names and container ports, including
+`repository-service:8000` for repository and chat requests.
 
   Service              URL
   -------------------- ------------------------------

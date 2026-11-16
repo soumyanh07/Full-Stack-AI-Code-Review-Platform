@@ -1,6 +1,8 @@
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 
 from app.core.config import settings
 
@@ -10,34 +12,41 @@ ALGORITHM = settings.ALGORITHM
 
 
 def create_access_token(
-    data: dict,
+    data: dict[str, Any],
     expires_delta: timedelta | None = None,
-):
-    to_encode = data.copy()
+) -> str:
+    if not isinstance(data, dict):
+        raise ValueError("Token payload must be a dictionary")
 
-    expire = datetime.now(UTC) + (
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (
         expires_delta
         if expires_delta is not None
         else timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
-    to_encode.update({"exp": expire})
+    if "sub" not in to_encode or not str(to_encode["sub"]).strip():
+        raise ValueError("JWT payload must include a non-empty 'sub' claim")
 
-    return jwt.encode(
-        to_encode,
-        SECRET_KEY,
-        algorithm=ALGORITHM,
-    )
+    to_encode["exp"] = expire
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def verify_token(token: str):
+def verify_token(token: str) -> dict[str, Any] | None:
+    if not token or not token.strip():
+        return None
+
     try:
         payload = jwt.decode(
             token,
             SECRET_KEY,
             algorithms=[ALGORITHM],
+            options={"require": ["exp", "sub"]},
         )
-        return payload
-
-    except JWTError:
+    except InvalidTokenError:
         return None
+
+    if not payload.get("sub"):
+        return None
+
+    return payload
