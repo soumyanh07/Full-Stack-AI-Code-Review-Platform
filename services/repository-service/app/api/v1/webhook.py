@@ -25,16 +25,13 @@ def _verify_signature(
     Verify GitHub webhook HMAC SHA-256 signature.
     """
 
-    webhook_secret = getattr(
-        settings,
-        "GITHUB_WEBHOOK_SECRET",
-        "",
-    )
+    webhook_secret = settings.GITHUB_WEBHOOK_SECRET.strip()
+    environment = settings.ENVIRONMENT.strip().lower()
 
     # During local development, allow webhooks when
     # no secret has been configured yet.
     if not webhook_secret:
-        return True
+        return environment == "development"
 
     if not signature:
         return False

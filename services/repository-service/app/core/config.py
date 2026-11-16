@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +19,7 @@ class Settings(BaseSettings):
     PORT: int = 8002
 
     DEBUG: bool = True
+    ENVIRONMENT: str = "development"
 
     # ==========================
     # Database
@@ -72,7 +74,17 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        validate_default=True,
     )
+
+    @field_validator("GITHUB_WEBHOOK_SECRET")
+    @classmethod
+    def validate_webhook_secret(cls, value: str, info: ValidationInfo) -> str:
+        secret = value.strip()
+        environment = str(info.data.get("ENVIRONMENT", "development")).strip().lower()
+        if environment == "production" and not secret:
+            raise ValueError("GITHUB_WEBHOOK_SECRET is required in production")
+        return secret
 
 
 @lru_cache
