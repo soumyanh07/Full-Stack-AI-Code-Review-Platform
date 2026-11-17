@@ -1,12 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.schemas.review import ReviewRequest, ReviewResponse
 from app.services.review_service import ReviewService
+from app.security.jwt import get_current_user
 
 
 router = APIRouter(
     prefix="/review",
     tags=["AI Review"],
+    dependencies=[Depends(get_current_user)],
 )
 
 review_service = ReviewService()

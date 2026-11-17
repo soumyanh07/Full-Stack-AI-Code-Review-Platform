@@ -10,6 +10,7 @@ celery_app = Celery(
     include=[
         "app.tasks.index_repository",
         "app.tasks.review_pull_request",
+        "app.tasks.dispatch_outbox",
     ],
 )
 
@@ -21,3 +22,10 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
 )
+
+celery_app.conf.beat_schedule = {
+    "dispatch-indexing-outbox-every-30-seconds": {
+        "task": "app.tasks.dispatch_outbox.dispatch_outbox_events",
+        "schedule": 30.0,
+    },
+}
