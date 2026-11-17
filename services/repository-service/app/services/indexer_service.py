@@ -45,6 +45,7 @@ class IndexerService:
         self,
         repository_id: int,
         repository_url: str,
+        local_path: str,
         owner: str | None = None,
         repository: str | None = None,
     ):
@@ -80,8 +81,8 @@ class IndexerService:
 
         local_path = self.github.clone_repository(
             repository_url,
-            owner,
-            repository,
+            local_path,
+            repository_id,
         )
 
         # ---------------------------------------------------------

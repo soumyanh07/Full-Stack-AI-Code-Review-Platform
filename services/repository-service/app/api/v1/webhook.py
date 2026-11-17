@@ -5,9 +5,13 @@ import hmac
 import json
 
 from fastapi import APIRouter, Header, HTTPException, Request
+from sqlalchemy.orm import Session
+
+from app.database.session import SessionLocal
+from app.models.outbox_event import OutboxEvent
+from app.services.repository_service import RepositoryService
 
 from app.core.config import settings
-from app.tasks.index_repository import index_repository
 from app.tasks.review_pull_request import review_pull_request
 
 
@@ -113,15 +117,51 @@ async def github_webhook(
             "event": x_github_event,
         }
 
-    repository = payload.get(
-        "repository"
-    )
+    repository = payload.get("repository")
 
-    if repository is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Repository missing",
+    if not isinstance(repository, dict):
+        raise HTTPException(status_code=400, detail="Repository missing")
+
+    owner_data = repository.get("owner") or {}
+    github_owner = owner_data.get("login")
+    github_name = repository.get("name")
+
+    if not github_owner or not github_name:
+        raise HTTPException(status_code=400, detail="Repository identity missing")
+
+    db = SessionLocal()
+    try:
+        registered_repositories = (
+            RepositoryService(db).get_registered_github_repositories(
+                github_owner,
+                github_name,
+            )
         )
+        registered_targets = [
+            (repository.id, repository.url)
+            for repository in registered_repositories
+        ]
+
+        if x_github_event == "push":
+            db.add_all([
+                OutboxEvent(
+                    repository_id=repository.id,
+                    event_type="repository.index",
+                )
+                for repository in registered_repositories
+            ])
+            db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+    if not registered_targets:
+        return {
+            "status": "ignored",
+            "reason": "Repository is not registered on this platform",
+        }
 
     # ============================================================
     # PULL REQUEST EVENT
@@ -146,18 +186,8 @@ async def github_webhook(
                 "action": action,
             }
 
-        owner_data = repository.get(
-            "owner",
-            {},
-        )
-
-        owner = owner_data.get(
-            "login"
-        )
-
-        repository_name = repository.get(
-            "name"
-        )
+        owner = github_owner
+        repository_name = github_name
 
         pull_request = payload.get(
             "pull_request",
@@ -206,33 +236,9 @@ async def github_webhook(
     # PUSH EVENT
     # ============================================================
 
-    repository_id = repository.get(
-        "id"
-    )
-
-    clone_url = repository.get(
-        "clone_url"
-    )
-
-    if repository_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Repository ID missing",
-        )
-
-    if not clone_url:
-        raise HTTPException(
-            status_code=400,
-            detail="Clone URL missing",
-        )
-
-    task = index_repository.delay(
-        repository_id,
-        clone_url,
-    )
-
     return {
-        "status": "queued",
+        "status": "accepted",
         "event": x_github_event,
-        "task_id": task.id,
+        "registered_copies": len(registered_targets),
+        "dispatch": "outbox",
     }

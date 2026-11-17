@@ -1,7 +1,9 @@
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
+
+from app.dependencies.auth import get_current_user
 
 from app.core.config import settings
 from app.utils.proxy import ProxyClient
@@ -9,6 +11,7 @@ from app.utils.proxy import ProxyClient
 logger = logging.getLogger("gateway.pr_review")
 
 router = APIRouter(
+    dependencies=[Depends(get_current_user)],
     prefix="/review",
     tags=["Pull Request Review"],
 )
